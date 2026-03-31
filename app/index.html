@@ -9,8 +9,28 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/themes.css" />
+  <style>
+    #nuvio-tizen-boot-status {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      z-index: 999999;
+      max-width: calc(100vw - 48px);
+      padding: 14px 18px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.82);
+      color: #fff;
+      font: 600 20px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0.02em;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    #nuvio-tizen-boot-status[data-state="error"] {
+      background: rgba(120, 0, 0, 0.9);
+    }
+  </style>
 </head>
 <body>
+  <div id="nuvio-tizen-boot-status">Booting Nuvio TV...</div>
   <script defer src="main.js"></script>
 </body>
 </html>
