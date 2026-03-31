@@ -24,3 +24,10 @@
   root.NUVIO_ENV = env;
   root.__NUVIO_ENV__ = Object.assign({}, root.__NUVIO_ENV__ || {}, env);
 }());
+
+;(function finishTizenEnvBootstrap() {
+  var root = typeof globalThis !== "undefined" ? globalThis : window;
+  if (typeof root.__NUVIO_TIZEN_BOOTSTRAP_APP__ === "function") {
+    root.__NUVIO_TIZEN_BOOTSTRAP_APP__();
+  }
+}());

@@ -12,6 +12,7 @@ if (tvInput && typeof tvInput.registerKey === "function") {
 function loadScript(src) {
   var script = document.createElement("script");
   script.src = src;
+  script.async = false;
   script.defer = false;
   document.body.appendChild(script);
 }
