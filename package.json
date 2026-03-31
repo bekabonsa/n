@@ -2,7 +2,7 @@
   "name": "Nuvio TV",
   "version": "0.1.4",
   "type": "module",
-  "description": "Self-contained TizenBrew test module for Nuvio TV",
+  "description": "Hosted TizenBrew wrapper for the Nuvio TV test build",
   "packageType": "app",
   "appName": "Nuvio TV",
   "appPath": "app/index.html",
@@ -16,6 +16,7 @@
   "evaluateScriptOnDocumentStart": false,
   "files": [
     "app",
+    "site",
     "icon.png",
     "README.md"
   ]

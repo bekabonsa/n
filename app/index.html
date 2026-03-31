@@ -5,32 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>Nuvio TV</title>
-  <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/layout.css" />
-  <link rel="stylesheet" href="css/components.css" />
-  <link rel="stylesheet" href="css/themes.css" />
   <style>
-    #nuvio-tizen-boot-status {
-      position: fixed;
-      left: 24px;
-      bottom: 24px;
-      z-index: 999999;
-      max-width: calc(100vw - 48px);
-      padding: 14px 18px;
-      border-radius: 14px;
-      background: rgba(0, 0, 0, 0.82);
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #000;
       color: #fff;
-      font: 600 20px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      letter-spacing: 0.02em;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    }
-    #nuvio-tizen-boot-status[data-state="error"] {
-      background: rgba(120, 0, 0, 0.9);
+      font: 600 24px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
   </style>
 </head>
 <body>
-  <div id="nuvio-tizen-boot-status">Booting Nuvio TV...</div>
-  <script defer src="main.js"></script>
+  <div>Opening Nuvio TV...</div>
+  <script src="main.js"></script>
 </body>
 </html>

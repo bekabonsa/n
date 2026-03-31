@@ -1,88 +1,26 @@
-window.__NUVIO_PLATFORM__ = "tizen";
+(function openHostedNuvioTvBuild() {
+  var hostedAppUrl = "https://cdn.jsdelivr.net/gh/bekabonsa/Nuvio-TIZEN/site/index.html";
+  var tvInput = window.tizen && window.tizen.tvinputdevice;
 
-var bootStatusNode = document.getElementById("nuvio-tizen-boot-status");
-var bootOverlayDismissed = false;
-
-function setBootStatus(message, isError) {
-  if (!bootStatusNode || bootOverlayDismissed) {
-    return;
-  }
-  bootStatusNode.textContent = message;
-  bootStatusNode.setAttribute("data-state", isError ? "error" : "info");
-}
-
-function dismissBootStatusWhenReady() {
-  if (bootOverlayDismissed) {
-    return;
-  }
-  if (!document.getElementById("app")) {
-    setTimeout(dismissBootStatusWhenReady, 500);
-    return;
-  }
-  bootOverlayDismissed = true;
-  if (bootStatusNode && bootStatusNode.parentNode) {
-    bootStatusNode.parentNode.removeChild(bootStatusNode);
-  }
-}
-
-window.addEventListener("error", function onError(event) {
-  var message = event && event.message ? event.message : "Unknown boot error";
-  setBootStatus("Boot error: " + message, true);
-});
-
-window.addEventListener("unhandledrejection", function onUnhandledRejection(event) {
-  var reason = event && event.reason;
-  var message = reason && reason.message ? reason.message : String(reason || "Unknown promise rejection");
-  setBootStatus("Boot rejection: " + message, true);
-});
-
-var tvInput = window.tizen && window.tizen.tvinputdevice;
-if (tvInput && typeof tvInput.registerKey === "function") {
-  ["MediaPlay", "MediaPause", "MediaPlayPause", "MediaFastForward", "MediaRewind"].forEach(function registerKey(keyName) {
+  function buildFreshHostedUrl() {
     try {
-      tvInput.registerKey(keyName);
-    } catch (_) {}
-  });
-}
-
-function loadScript(src, label, onLoad) {
-  setBootStatus("Loading " + label + "...");
-  var script = document.createElement("script");
-  script.src = src;
-  script.async = false;
-  script.defer = false;
-  script.onload = function handleLoad() {
-    setBootStatus("Loaded " + label + ".");
-    if (typeof onLoad === "function") {
-      onLoad();
+      var url = new URL(hostedAppUrl);
+      url.searchParams.set("source", "tizenbrew");
+      url.searchParams.set("wrapper", "tizen");
+      url.searchParams.set("_cb", String(Date.now()));
+      return url.toString();
+    } catch (_) {
+      return hostedAppUrl + "?_cb=" + encodeURIComponent(String(Date.now()));
     }
-  };
-  script.onerror = function handleError() {
-    setBootStatus("Failed to load " + label + ".", true);
-  };
-  document.body.appendChild(script);
-}
-
-window.__NUVIO_TIZEN_BOOTSTRAP_APP__ = function bootstrapApp() {
-  if (window.__NUVIO_TIZEN_APP_BOOTSTRAPPED__) {
-    return;
   }
 
-  window.__NUVIO_TIZEN_APP_BOOTSTRAPPED__ = true;
-  setBootStatus("Starting app bootstrap...");
-  loadScript("js/runtime/polyfills.js", "polyfills", function onPolyfills() {
-    loadScript("js/runtime/env.js", "runtime env", function onRuntimeEnv() {
-      loadScript("assets/libs/qrcode-generator.js", "QR library", function onQrLibrary() {
-        loadScript("app.bundle.js", "app bundle", function onBundle() {
-          setBootStatus("App bundle loaded.");
-          dismissBootStatusWhenReady();
-        });
-      });
+  if (tvInput && typeof tvInput.registerKey === "function") {
+    ["MediaPlay", "MediaPause", "MediaPlayPause", "MediaFastForward", "MediaRewind"].forEach(function registerKey(keyName) {
+      try {
+        tvInput.registerKey(keyName);
+      } catch (_) {}
     });
-  });
-};
+  }
 
-loadScript("nuvio.env.js", "runtime config", function onEnvConfig() {
-  setBootStatus("Runtime config loaded.");
-  setTimeout(dismissBootStatusWhenReady, 4000);
-});
+  window.location.replace(buildFreshHostedUrl());
+}());
