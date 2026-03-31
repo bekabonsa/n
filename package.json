@@ -1,0 +1,22 @@
+{
+  "name": "Nuvio TV",
+  "version": "0.1.4",
+  "type": "module",
+  "description": "Self-contained TizenBrew test module for Nuvio TV",
+  "packageType": "app",
+  "appName": "Nuvio TV",
+  "appPath": "app/index.html",
+  "keys": [
+    "MediaPlay",
+    "MediaPause",
+    "MediaPlayPause",
+    "MediaFastForward",
+    "MediaRewind"
+  ],
+  "evaluateScriptOnDocumentStart": false,
+  "files": [
+    "app",
+    "icon.png",
+    "README.md"
+  ]
+}
