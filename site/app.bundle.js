@@ -11077,6 +11077,8 @@
     avplayDurationMs: 0,
     avplayTrackSyncAt: 0,
     lastPlaybackErrorCode: 0,
+    requestedPlaybackEngine: "none",
+    lastPlaybackFailureDetail: "",
     currentPlaybackUrl: "",
     currentPlaybackHeaders: {},
     currentPlaybackMediaSourceType: null,
@@ -11775,12 +11777,14 @@
       this.avplayCurrentTimeMs = 0;
       this.avplayDurationMs = 0;
       this.lastPlaybackErrorCode = 0;
+      this.lastPlaybackFailureDetail = "";
       this.playbackEngine = this.getPlatformAvplayEngineName();
       this.emitVideoEvent("waiting", { playbackEngine: this.playbackEngine });
       try {
         avplay.open(this.avplayUrl);
       } catch (error) {
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error);
+        this.lastPlaybackFailureDetail = `avplay_open:${String((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error || "unknown").trim()}`;
         this.teardownAvPlay();
         this.playbackEngine = "none";
         return false;
@@ -11817,6 +11821,7 @@
             this.avplayReady = false;
             this.isPlaying = false;
             this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+            this.lastPlaybackFailureDetail = `avplay_error:${String(errorValue || "unknown").trim()}`;
             this.stopAvPlayTickTimer();
             this.emitVideoEvent("error", {
               playbackEngine: this.playbackEngine,
@@ -11859,6 +11864,7 @@
         } catch (error) {
           this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error);
           this.isPlaying = false;
+          this.lastPlaybackFailureDetail = `avplay_play:${String((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error || "unknown").trim()}`;
           this.emitVideoEvent("error", {
             playbackEngine: this.playbackEngine,
             mediaErrorCode: this.lastPlaybackErrorCode
@@ -11867,6 +11873,7 @@
       };
       const onPrepareError = (errorValue) => {
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+        this.lastPlaybackFailureDetail = `avplay_prepare:${String(errorValue || "unknown").trim()}`;
         this.isPlaying = false;
         this.teardownAvPlay();
         this.playbackEngine = "none";
@@ -11970,6 +11977,12 @@
     },
     getLastPlaybackErrorCode() {
       return Number(this.lastPlaybackErrorCode || 0);
+    },
+    getRequestedPlaybackEngine() {
+      return String(this.requestedPlaybackEngine || "none").trim() || "none";
+    },
+    getLastPlaybackFailureDetail() {
+      return String(this.lastPlaybackFailureDetail || "").trim();
     },
     forceAvPlayFallbackForCurrentSource(reason = "fallback") {
       var _a, _b;
@@ -13012,6 +13025,7 @@
         this.currentPlaybackHeaders = __spreadValues({}, requestHeaders || {});
         this.currentPlaybackMediaSourceType = mediaSourceType || null;
         this.lastPlaybackErrorCode = 0;
+        this.lastPlaybackFailureDetail = "";
         const playToken = Number(this.playRequestToken || 0) + 1;
         this.playRequestToken = playToken;
         const sourceType = String(mediaSourceType || this.guessMediaMimeType(url) || "").trim() || null;
@@ -13020,6 +13034,7 @@
           return;
         }
         const preferredEngine = forceEngine || this.choosePlaybackEngine(url, sourceType, itemType);
+        this.requestedPlaybackEngine = String(preferredEngine || "none").trim() || "none";
         this.rememberPlaybackEngineAttempt(this.currentPlaybackUrl, preferredEngine, {
           reset: !forceEngine
         });
@@ -17146,6 +17161,9 @@
     getPlayerDebugStateLabel() {
       const statusText = String(this.sourcesError || "").trim();
       const engine = String(PlayerController.playbackEngine || "none").trim() || "none";
+      const requestedEngine = typeof PlayerController.getRequestedPlaybackEngine === "function" ? PlayerController.getRequestedPlaybackEngine() : engine;
+      const errorCode = typeof PlayerController.getLastPlaybackErrorCode === "function" ? Number(PlayerController.getLastPlaybackErrorCode() || 0) : 0;
+      const failureDetail = typeof PlayerController.getLastPlaybackFailureDetail === "function" ? PlayerController.getLastPlaybackFailureDetail() : "";
       let state = "PLAYING";
       if (this.sourcesPanelVisible) {
         state = "SOURCES_PANEL";
@@ -17174,8 +17192,11 @@
       }
       return [
         `state=${state}`,
+        `requested=${requestedEngine}`,
         `engine=${engine}`,
         `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
+        errorCode > 0 ? `code=${errorCode}` : "",
+        failureDetail ? `detail=${failureDetail}` : "",
         statusText ? `msg=${statusText}` : ""
       ].filter(Boolean).join(" | ");
     },

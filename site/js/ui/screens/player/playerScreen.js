@@ -3641,6 +3641,15 @@ export const PlayerScreen = {
   getPlayerDebugStateLabel() {
     const statusText = String(this.sourcesError || "").trim();
     const engine = String(PlayerController.playbackEngine || "none").trim() || "none";
+    const requestedEngine = typeof PlayerController.getRequestedPlaybackEngine === "function"
+      ? PlayerController.getRequestedPlaybackEngine()
+      : engine;
+    const errorCode = typeof PlayerController.getLastPlaybackErrorCode === "function"
+      ? Number(PlayerController.getLastPlaybackErrorCode() || 0)
+      : 0;
+    const failureDetail = typeof PlayerController.getLastPlaybackFailureDetail === "function"
+      ? PlayerController.getLastPlaybackFailureDetail()
+      : "";
     let state = "PLAYING";
 
     if (this.sourcesPanelVisible) {
@@ -3671,8 +3680,11 @@ export const PlayerScreen = {
 
     return [
       `state=${state}`,
+      `requested=${requestedEngine}`,
       `engine=${engine}`,
       `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
+      errorCode > 0 ? `code=${errorCode}` : "",
+      failureDetail ? `detail=${failureDetail}` : "",
       statusText ? `msg=${statusText}` : ""
     ].filter(Boolean).join(" | ");
   },

@@ -41,6 +41,8 @@ export const PlayerController = {
   avplayDurationMs: 0,
   avplayTrackSyncAt: 0,
   lastPlaybackErrorCode: 0,
+  requestedPlaybackEngine: "none",
+  lastPlaybackFailureDetail: "",
   currentPlaybackUrl: "",
   currentPlaybackHeaders: {},
   currentPlaybackMediaSourceType: null,
@@ -857,6 +859,7 @@ export const PlayerController = {
     this.avplayCurrentTimeMs = 0;
     this.avplayDurationMs = 0;
     this.lastPlaybackErrorCode = 0;
+    this.lastPlaybackFailureDetail = "";
     this.playbackEngine = this.getPlatformAvplayEngineName();
 
     this.emitVideoEvent("waiting", { playbackEngine: this.playbackEngine });
@@ -865,6 +868,7 @@ export const PlayerController = {
       avplay.open(this.avplayUrl);
     } catch (error) {
       this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(error?.name || error?.message || error);
+      this.lastPlaybackFailureDetail = `avplay_open:${String(error?.name || error?.message || error || "unknown").trim()}`;
       this.teardownAvPlay();
       this.playbackEngine = "none";
       return false;
@@ -903,6 +907,7 @@ export const PlayerController = {
           this.avplayReady = false;
           this.isPlaying = false;
           this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+          this.lastPlaybackFailureDetail = `avplay_error:${String(errorValue || "unknown").trim()}`;
           this.stopAvPlayTickTimer();
           this.emitVideoEvent("error", {
             playbackEngine: this.playbackEngine,
@@ -946,6 +951,7 @@ export const PlayerController = {
       } catch (error) {
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(error?.name || error?.message || error);
         this.isPlaying = false;
+        this.lastPlaybackFailureDetail = `avplay_play:${String(error?.name || error?.message || error || "unknown").trim()}`;
         this.emitVideoEvent("error", {
           playbackEngine: this.playbackEngine,
           mediaErrorCode: this.lastPlaybackErrorCode
@@ -955,6 +961,7 @@ export const PlayerController = {
 
     const onPrepareError = (errorValue) => {
       this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+      this.lastPlaybackFailureDetail = `avplay_prepare:${String(errorValue || "unknown").trim()}`;
       this.isPlaying = false;
       this.teardownAvPlay();
       this.playbackEngine = "none";
@@ -1064,6 +1071,14 @@ export const PlayerController = {
 
   getLastPlaybackErrorCode() {
     return Number(this.lastPlaybackErrorCode || 0);
+  },
+
+  getRequestedPlaybackEngine() {
+    return String(this.requestedPlaybackEngine || "none").trim() || "none";
+  },
+
+  getLastPlaybackFailureDetail() {
+    return String(this.lastPlaybackFailureDetail || "").trim();
   },
 
   forceAvPlayFallbackForCurrentSource(reason = "fallback") {
@@ -2237,6 +2252,7 @@ export const PlayerController = {
     this.currentPlaybackHeaders = { ...(requestHeaders || {}) };
     this.currentPlaybackMediaSourceType = mediaSourceType || null;
     this.lastPlaybackErrorCode = 0;
+    this.lastPlaybackFailureDetail = "";
     const playToken = Number(this.playRequestToken || 0) + 1;
     this.playRequestToken = playToken;
 
@@ -2246,6 +2262,7 @@ export const PlayerController = {
       return;
     }
     const preferredEngine = forceEngine || this.choosePlaybackEngine(url, sourceType, itemType);
+    this.requestedPlaybackEngine = String(preferredEngine || "none").trim() || "none";
     this.rememberPlaybackEngineAttempt(this.currentPlaybackUrl, preferredEngine, {
       reset: !forceEngine
     });
