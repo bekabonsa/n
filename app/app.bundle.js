@@ -15062,9 +15062,6 @@
       if (!Platform.isTizen()) {
         return null;
       }
-      if (typeof PlayerController.canUseAvPlay !== "function" || !PlayerController.canUseAvPlay()) {
-        return null;
-      }
       const mediaSourceType = String(
         (streamCandidate == null ? void 0 : streamCandidate.sourceType) || ((_a = streamCandidate == null ? void 0 : streamCandidate.raw) == null ? void 0 : _a.type) || ((_b = streamCandidate == null ? void 0 : streamCandidate.raw) == null ? void 0 : _b.mimeType) || ((_d = (_c = PlayerController).guessMediaMimeType) == null ? void 0 : _d.call(_c, streamUrl)) || ""
       ).trim();

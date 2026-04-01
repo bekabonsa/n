@@ -1177,9 +1177,6 @@ export const PlayerScreen = {
     if (!Platform.isTizen()) {
       return null;
     }
-    if (typeof PlayerController.canUseAvPlay !== "function" || !PlayerController.canUseAvPlay()) {
-      return null;
-    }
 
     const mediaSourceType = String(
       streamCandidate?.sourceType

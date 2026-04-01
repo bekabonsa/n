@@ -17,6 +17,12 @@
   });
 }());
 
+;(function applyTizenPlaybackDefaults() {
+  var root = typeof globalThis !== "undefined" ? globalThis : window;
+  var env = root.__NUVIO_ENV__ || {};
+  env.PREFERRED_PLAYBACK_ORDER = ["platform-avplay", "native-file", "native-hls", "hls.js", "dash.js"];
+  root.__NUVIO_ENV__ = env;
+}());
 ;(function finishTizenEnvBootstrap() {
   var root = typeof globalThis !== "undefined" ? globalThis : window;
   if (typeof root.__NUVIO_TIZEN_BOOTSTRAP_APP__ === "function") {
