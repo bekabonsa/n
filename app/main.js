@@ -1,5 +1,5 @@
 (function openHostedNuvioTvBuild() {
-  var hostedSiteRevision = "b3bec0b";
+  var hostedSiteRevision = "fa1c8dc";
   var hostedAppUrl = "https://rawcdn.githack.com/bekabonsa/n/" + hostedSiteRevision + "/site/index.html";
   var hostedBuildInfoUrl = "https://rawcdn.githack.com/bekabonsa/n/" + hostedSiteRevision + "/site/build-info.json";
   var launcherBuild = hostedSiteRevision;
