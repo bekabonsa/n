@@ -12864,6 +12864,11 @@
       });
     },
     choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
+      const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+      const isDirectTizenFile = Platform.isTizen() && this.canUseAvPlay() && this.isLikelyDirectFileUrl(url) && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+      if (isDirectTizenFile) {
+        return this.getPlatformAvplayEngineName();
+      }
       const candidates = this.orderPlaybackCandidates(
         this.getPlaybackEngineCandidates(url, sourceType, itemType),
         url,
@@ -16886,6 +16891,26 @@
     isDialogOpen() {
       return this.subtitleDialogVisible || this.audioDialogVisible || this.sourcesPanelVisible || this.episodePanelVisible || this.speedDialogVisible;
     },
+    shouldShowControlsOverlay() {
+      if (!this.controlsVisible) {
+        return false;
+      }
+      if (this.loadingVisible && !this.hasPresentedPlaybackFrame && !this.sourcesError && !this.isDialogOpen()) {
+        return false;
+      }
+      return true;
+    },
+    refreshControlsOverlayVisibility() {
+      var _a;
+      if (this.isExternalFrameMode()) {
+        return;
+      }
+      const overlay = (_a = this.uiRefs) == null ? void 0 : _a.controlsOverlay;
+      if (!overlay) {
+        return;
+      }
+      overlay.classList.toggle("hidden", !this.shouldShowControlsOverlay());
+    },
     setControlsVisible(visible, { focus = false } = {}) {
       var _a;
       this.controlsVisible = Boolean(visible);
@@ -16896,7 +16921,7 @@
       if (!overlay) {
         return;
       }
-      overlay.classList.toggle("hidden", !this.controlsVisible);
+      this.refreshControlsOverlayVisibility();
       this.renderSkipIntroButton();
       if (this.controlsVisible) {
         this.renderControlButtons();
@@ -17065,6 +17090,7 @@
         statusNode.textContent = statusText;
         statusNode.classList.toggle("hidden", !statusText);
       }
+      this.refreshControlsOverlayVisibility();
       if (this.loadingVisible) {
         this.dismissPauseOverlay();
         if (this.seekOverlayVisible || this.seekPreviewSeconds != null) {

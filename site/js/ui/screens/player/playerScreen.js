@@ -3363,6 +3363,27 @@ export const PlayerScreen = {
     return this.subtitleDialogVisible || this.audioDialogVisible || this.sourcesPanelVisible || this.episodePanelVisible || this.speedDialogVisible;
   },
 
+  shouldShowControlsOverlay() {
+    if (!this.controlsVisible) {
+      return false;
+    }
+    if (this.loadingVisible && !this.hasPresentedPlaybackFrame && !this.sourcesError && !this.isDialogOpen()) {
+      return false;
+    }
+    return true;
+  },
+
+  refreshControlsOverlayVisibility() {
+    if (this.isExternalFrameMode()) {
+      return;
+    }
+    const overlay = this.uiRefs?.controlsOverlay;
+    if (!overlay) {
+      return;
+    }
+    overlay.classList.toggle("hidden", !this.shouldShowControlsOverlay());
+  },
+
   setControlsVisible(visible, { focus = false } = {}) {
     this.controlsVisible = Boolean(visible);
     if (this.isExternalFrameMode()) {
@@ -3372,7 +3393,7 @@ export const PlayerScreen = {
     if (!overlay) {
       return;
     }
-    overlay.classList.toggle("hidden", !this.controlsVisible);
+    this.refreshControlsOverlayVisibility();
     this.renderSkipIntroButton();
     if (this.controlsVisible) {
       this.renderControlButtons();
@@ -3557,6 +3578,7 @@ export const PlayerScreen = {
       statusNode.textContent = statusText;
       statusNode.classList.toggle("hidden", !statusText);
     }
+    this.refreshControlsOverlayVisibility();
     if (this.loadingVisible) {
       this.dismissPauseOverlay();
       if (this.seekOverlayVisible || this.seekPreviewSeconds != null) {

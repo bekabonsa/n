@@ -2063,6 +2063,18 @@ export const PlayerController = {
   },
 
   choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
+    const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+    const isDirectTizenFile = Platform.isTizen()
+      && this.canUseAvPlay()
+      && this.isLikelyDirectFileUrl(url)
+      && !this.isLikelyHlsMimeType(normalizedSourceType)
+      && !this.isLikelyDashMimeType(normalizedSourceType)
+      && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+
+    if (isDirectTizenFile) {
+      return this.getPlatformAvplayEngineName();
+    }
+
     const candidates = this.orderPlaybackCandidates(
       this.getPlaybackEngineCandidates(url, sourceType, itemType),
       url,

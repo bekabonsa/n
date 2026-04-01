@@ -7143,6 +7143,9 @@ button:focus-visible {
   position: absolute;
   inset: 0;
   z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 1;
   transition: opacity 220ms ease;
 }
@@ -7185,10 +7188,11 @@ button:focus-visible {
 }
 
 .player-loading-center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
+  z-index: 1;
+  left: auto;
+  top: auto;
+  transform: none;
   width: 820px;
   width: min(80vw, 900px);
   text-align: center;
