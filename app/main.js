@@ -2,12 +2,46 @@ window.__NUVIO_PLATFORM__ = "tizen";
 
 var bootStatusNode = document.getElementById("nuvio-tizen-boot-status");
 var buildLabelNode = document.getElementById("nuvio-tizen-build-label");
+var debugDetailNode = document.getElementById("nuvio-tizen-debug-detail");
 var bootOverlayDismissed = false;
-var buildLabel = "2026-04-01T21:41:13.082Z";
+var buildLabel = "2026-04-01T22:20:51.787Z";
 
 if (buildLabelNode) {
   buildLabelNode.textContent = buildLabel || "packaged-build";
 }
+
+window.__NUVIO_BOOT_DEBUG__ = {
+  enabled: true,
+  setStatus: function setBootStatus(message) {
+    setBootStatus(message, false);
+  },
+  fail: function failBootStatus(message) {
+    setBootStatus(message, true);
+  },
+  done: function finishBootStatus(message) {
+    setBootStatus(message || "App shell ready.", false);
+  },
+  setDetail: function setDetail(message) {
+    if (!debugDetailNode) {
+      return;
+    }
+    debugDetailNode.textContent = String(message || "");
+  },
+  failDetail: function failDetail(message) {
+    if (!debugDetailNode) {
+      return;
+    }
+    debugDetailNode.textContent = String(message || "");
+    debugDetailNode.style.color = "rgba(255, 220, 220, 0.98)";
+  },
+  clearDetail: function clearDetail() {
+    if (!debugDetailNode) {
+      return;
+    }
+    debugDetailNode.textContent = "";
+    debugDetailNode.style.color = "rgba(245, 249, 255, 0.98)";
+  }
+};
 
 function setBootStatus(message, isError) {
   if (!bootStatusNode || bootOverlayDismissed) {
@@ -29,7 +63,7 @@ function dismissBootStatusWhenReady() {
   if (buildLabelNode && buildLabelNode.parentNode) {
     buildLabelNode.parentNode.removeChild(buildLabelNode);
   }
-  if (bootStatusNode && bootStatusNode.parentNode) {
+  if (bootStatusNode && bootStatusNode.parentNode && !String(debugDetailNode && debugDetailNode.textContent || "").trim()) {
     bootStatusNode.parentNode.removeChild(bootStatusNode);
   }
 }
