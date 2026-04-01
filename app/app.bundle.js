@@ -11085,6 +11085,7 @@
     avplayFallbackAttempts: /* @__PURE__ */ new Set(),
     playbackEngineAttempts: /* @__PURE__ */ new Map(),
     playRequestToken: 0,
+    avplayPrepareAttemptId: 0,
     nativeMediaId: "",
     nativeMediaIdLookupToken: 0,
     selectedWebOsEmbeddedAudioTrackIndex: -1,
@@ -11723,7 +11724,7 @@
       } catch (_) {
       }
       try {
-        (_f = avplay.setDisplayMethod) == null ? void 0 : _f.call(avplay, "PLAYER_DISPLAY_MODE_FULL_SCREEN");
+        (_f = avplay.setDisplayMethod) == null ? void 0 : _f.call(avplay, "PLAYER_DISPLAY_MODE_LETTER_BOX");
       } catch (_) {
       }
     },
@@ -11761,7 +11762,7 @@
       this.avplayDurationMs = 0;
     },
     playWithAvPlay(url) {
-      var _a;
+      var _a, _b;
       if (!this.canUseAvPlay()) {
         return false;
       }
@@ -11791,7 +11792,11 @@
       }
       this.setAvPlayDisplayRect();
       try {
-        (_a = avplay.setListener) == null ? void 0 : _a.call(avplay, {
+        (_a = avplay.seekTo) == null ? void 0 : _a.call(avplay, 0);
+      } catch (_) {
+      }
+      try {
+        (_b = avplay.setListener) == null ? void 0 : _b.call(avplay, {
           onbufferingstart: () => {
             this.avplayReady = false;
             this.emitVideoEvent("waiting", { playbackEngine: this.playbackEngine });
@@ -11832,6 +11837,10 @@
         });
       } catch (_) {
       }
+      const prepareAttemptId = Number(this.avplayPrepareAttemptId || 0) + 1;
+      this.avplayPrepareAttemptId = prepareAttemptId;
+      let prepareAttempts = 0;
+      const maxPrepareAttempts = 4;
       const onPrepared = () => {
         var _a2;
         if (!this.isUsingAvPlay()) {
@@ -11872,6 +11881,51 @@
         }
       };
       const onPrepareError = (errorValue) => {
+        var _a2;
+        if (!this.isUsingAvPlay()) {
+          return;
+        }
+        if (Number(this.avplayPrepareAttemptId || 0) !== prepareAttemptId) {
+          return;
+        }
+        if (prepareAttempts < maxPrepareAttempts) {
+          prepareAttempts += 1;
+          try {
+            (_a2 = avplay.stop) == null ? void 0 : _a2.call(avplay);
+          } catch (_) {
+          }
+          setTimeout(() => {
+            var _a3;
+            if (!this.isUsingAvPlay()) {
+              return;
+            }
+            if (Number(this.avplayPrepareAttemptId || 0) !== prepareAttemptId) {
+              return;
+            }
+            try {
+              avplay.open(this.avplayUrl);
+              this.setAvPlayDisplayRect();
+              try {
+                (_a3 = avplay.seekTo) == null ? void 0 : _a3.call(avplay, 0);
+              } catch (_) {
+              }
+              if (typeof avplay.prepareAsync === "function") {
+                avplay.prepareAsync(onPrepared, onPrepareError);
+                return;
+              }
+              if (typeof avplay.prepare === "function") {
+                avplay.prepare();
+                onPrepared();
+                return;
+              }
+            } catch (retryError) {
+              onPrepareError((retryError == null ? void 0 : retryError.name) || (retryError == null ? void 0 : retryError.message) || retryError);
+              return;
+            }
+            onPrepareError("prepare_not_supported");
+          }, 160);
+          return;
+        }
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
         this.lastPlaybackFailureDetail = `avplay_prepare:${String(errorValue || "unknown").trim()}`;
         this.isPlaying = false;

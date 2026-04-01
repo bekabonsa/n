@@ -49,6 +49,7 @@ export const PlayerController = {
   avplayFallbackAttempts: new Set(),
   playbackEngineAttempts: new Map(),
   playRequestToken: 0,
+  avplayPrepareAttemptId: 0,
   nativeMediaId: "",
   nativeMediaIdLookupToken: 0,
   selectedWebOsEmbeddedAudioTrackIndex: -1,
@@ -796,7 +797,7 @@ export const PlayerController = {
       // Ignore display-rect failures.
     }
     try {
-      avplay.setDisplayMethod?.("PLAYER_DISPLAY_MODE_FULL_SCREEN");
+      avplay.setDisplayMethod?.("PLAYER_DISPLAY_MODE_LETTER_BOX");
     } catch (_) {
       // Ignore display-method failures.
     }
@@ -875,6 +876,11 @@ export const PlayerController = {
     }
 
     this.setAvPlayDisplayRect();
+    try {
+      avplay.seekTo?.(0);
+    } catch (_) {
+      // Ignore initial seek failures on older firmware.
+    }
 
     try {
       avplay.setListener?.({
@@ -920,6 +926,11 @@ export const PlayerController = {
       // Ignore listener setup failures; prepareAsync/play may still work.
     }
 
+    const prepareAttemptId = Number(this.avplayPrepareAttemptId || 0) + 1;
+    this.avplayPrepareAttemptId = prepareAttemptId;
+    let prepareAttempts = 0;
+    const maxPrepareAttempts = 4;
+
     const onPrepared = () => {
       if (!this.isUsingAvPlay()) {
         return;
@@ -960,6 +971,51 @@ export const PlayerController = {
     };
 
     const onPrepareError = (errorValue) => {
+      if (!this.isUsingAvPlay()) {
+        return;
+      }
+      if (Number(this.avplayPrepareAttemptId || 0) !== prepareAttemptId) {
+        return;
+      }
+      if (prepareAttempts < maxPrepareAttempts) {
+        prepareAttempts += 1;
+        try {
+          avplay.stop?.();
+        } catch (_) {
+          // Ignore retry stop failures.
+        }
+        setTimeout(() => {
+          if (!this.isUsingAvPlay()) {
+            return;
+          }
+          if (Number(this.avplayPrepareAttemptId || 0) !== prepareAttemptId) {
+            return;
+          }
+          try {
+            avplay.open(this.avplayUrl);
+            this.setAvPlayDisplayRect();
+            try {
+              avplay.seekTo?.(0);
+            } catch (_) {
+              // Ignore initial seek failures on retry.
+            }
+            if (typeof avplay.prepareAsync === "function") {
+              avplay.prepareAsync(onPrepared, onPrepareError);
+              return;
+            }
+            if (typeof avplay.prepare === "function") {
+              avplay.prepare();
+              onPrepared();
+              return;
+            }
+          } catch (retryError) {
+            onPrepareError(retryError?.name || retryError?.message || retryError);
+            return;
+          }
+          onPrepareError("prepare_not_supported");
+        }, 160);
+        return;
+      }
       this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
       this.lastPlaybackFailureDetail = `avplay_prepare:${String(errorValue || "unknown").trim()}`;
       this.isPlaying = false;
