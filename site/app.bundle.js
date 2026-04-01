@@ -17154,7 +17154,7 @@
       ].filter(Boolean).join(" | ");
     },
     updateDebugStateBadge() {
-      var _a, _b;
+      var _a, _b, _c, _d, _e, _f;
       const node = (_a = this.uiRefs) == null ? void 0 : _a.debugState;
       if (!node) {
         return;
@@ -17162,9 +17162,12 @@
       const enabled = Boolean((_b = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _b.enabled);
       node.classList.toggle("hidden", !enabled);
       if (!enabled) {
+        (_d = (_c = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _c.clearDetail) == null ? void 0 : _d.call(_c);
         return;
       }
-      node.textContent = this.getPlayerDebugStateLabel();
+      const label = this.getPlayerDebugStateLabel();
+      (_f = (_e = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _e.setDetail) == null ? void 0 : _f.call(_e, label);
+      node.textContent = label;
     },
     updateUiTick() {
       var _a, _b, _c, _d;
@@ -20959,11 +20962,12 @@ ${normalized}`;
       });
     },
     cleanup() {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e, _f;
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.clearDetail) == null ? void 0 : _b.call(_a);
       this.cancelSeekPreview({ commit: false });
       this.dismissPauseOverlay();
       this.pauseOverlayMetaRequestToken = Number(this.pauseOverlayMetaRequestToken || 0) + 1;
-      (_b = (_a = this.streamCandidatesByVideoId) == null ? void 0 : _a.clear) == null ? void 0 : _b.call(_a);
+      (_d = (_c = this.streamCandidatesByVideoId) == null ? void 0 : _c.clear) == null ? void 0 : _d.call(_c);
       this.skipIntervalsRequestToken = Number(this.skipIntervalsRequestToken || 0) + 1;
       this.subtitleLoadToken = (this.subtitleLoadToken || 0) + 1;
       this.manifestLoadToken = (this.manifestLoadToken || 0) + 1;
@@ -21000,8 +21004,8 @@ ${normalized}`;
       PlayerController.stop();
       if (this.container) {
         this.container.style.display = "none";
-        (_c = this.container.querySelector("#playerUiRoot")) == null ? void 0 : _c.remove();
-        (_d = this.container.querySelector("#episodeSidePanel")) == null ? void 0 : _d.remove();
+        (_e = this.container.querySelector("#playerUiRoot")) == null ? void 0 : _e.remove();
+        (_f = this.container.querySelector("#episodeSidePanel")) == null ? void 0 : _f.remove();
       }
       this.uiRefs = null;
       this.lastUiTickState = null;
@@ -39220,6 +39224,13 @@ ${normalized}`;
     } catch (_) {
     }
   }
+  function clearBootDebugDetail() {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.clearDetail) == null ? void 0 : _b.call(_a);
+    } catch (_) {
+    }
+  }
   function formatErrorMessage(error) {
     if (!error) {
       return "Unknown error";
@@ -39264,6 +39275,7 @@ ${normalized}`;
   }
   function bootstrapApp() {
     return __async(this, null, function* () {
+      clearBootDebugDetail();
       setBootDebugStatus("Rendering app shell...");
       renderAppShell();
       setBootDebugStatus("Initializing platform...");
@@ -39321,7 +39333,6 @@ ${normalized}`;
       });
       setBootDebugStatus("Bootstrapping auth...");
       yield AuthManager.bootstrap();
-      setBootDebugStatus("Auth bootstrap completed.");
     });
   }
   function bootstrapAddonRemoteMode() {

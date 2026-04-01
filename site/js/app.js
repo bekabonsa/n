@@ -34,6 +34,18 @@ function finishBootDebugStatus(message) {
   } catch (_) {}
 }
 
+function setBootDebugDetail(message) {
+  try {
+    globalThis.__NUVIO_BOOT_DEBUG__?.setDetail?.(message);
+  } catch (_) {}
+}
+
+function clearBootDebugDetail() {
+  try {
+    globalThis.__NUVIO_BOOT_DEBUG__?.clearDetail?.();
+  } catch (_) {}
+}
+
 function formatErrorMessage(error) {
   if (!error) {
     return "Unknown error";
@@ -81,6 +93,7 @@ function isAddonRemoteMode() {
 }
 
 async function bootstrapApp() {
+  clearBootDebugDetail();
   setBootDebugStatus("Rendering app shell...");
   renderAppShell();
   setBootDebugStatus("Initializing platform...");
@@ -143,7 +156,6 @@ async function bootstrapApp() {
 
   setBootDebugStatus("Bootstrapping auth...");
   await AuthManager.bootstrap();
-  setBootDebugStatus("Auth bootstrap completed.");
 }
 
 async function bootstrapAddonRemoteMode() {

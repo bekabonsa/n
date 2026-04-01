@@ -31,13 +31,16 @@
         return;
       }
 
+      var hideTimer = 0;
       var node = document.createElement("div");
+      var bootNode = document.createElement("div");
+      var detailNode = document.createElement("div");
       node.id = "nuvio-boot-debug";
       node.style.position = "fixed";
       node.style.left = "24px";
-      node.style.bottom = "24px";
+      node.style.top = "24px";
       node.style.zIndex = "999999";
-      node.style.maxWidth = "calc(100vw - 48px)";
+      node.style.maxWidth = "min(1100px, calc(100vw - 48px))";
       node.style.padding = "14px 18px";
       node.style.borderRadius = "14px";
       node.style.background = "rgba(0, 0, 0, 0.82)";
@@ -45,14 +48,42 @@
       node.style.font = "600 20px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
       node.style.letterSpacing = "0.02em";
       node.style.boxShadow = "0 10px 30px rgba(0, 0, 0, 0.35)";
-      node.textContent = "Boot debug active.";
+      node.style.whiteSpace = "normal";
+      node.style.wordBreak = "break-word";
+      bootNode.textContent = "Boot debug active.";
+      detailNode.style.marginTop = "8px";
+      detailNode.style.paddingTop = "8px";
+      detailNode.style.borderTop = "1px solid rgba(255,255,255,0.15)";
+      detailNode.style.font = "600 16px/1.35 Menlo, Monaco, 'Courier New', monospace";
+      detailNode.style.display = "none";
+      node.appendChild(bootNode);
+      node.appendChild(detailNode);
       document.addEventListener("DOMContentLoaded", function onReady() {
         document.body.appendChild(node);
       }, { once: true });
 
+      function syncVisibility() {
+        var hasBootText = Boolean(String(bootNode.textContent || "").trim());
+        var hasDetailText = Boolean(String(detailNode.textContent || "").trim());
+        node.style.display = hasBootText || hasDetailText ? "block" : "none";
+      }
+
       function setStatus(message, isError) {
-        node.textContent = String(message || "");
+        if (hideTimer) {
+          clearTimeout(hideTimer);
+          hideTimer = 0;
+        }
+        bootNode.textContent = String(message || "");
         node.style.background = isError ? "rgba(120, 0, 0, 0.92)" : "rgba(0, 0, 0, 0.82)";
+        syncVisibility();
+      }
+
+      function setDetail(message, isError) {
+        var text = String(message || "").trim();
+        detailNode.textContent = text;
+        detailNode.style.display = text ? "block" : "none";
+        detailNode.style.color = isError ? "rgba(255, 220, 220, 0.98)" : "rgba(235, 243, 252, 0.98)";
+        syncVisibility();
       }
 
       root.__NUVIO_BOOT_DEBUG__ = {
@@ -65,6 +96,19 @@
         },
         done: function finishBootStatus(message) {
           setStatus(message || "App shell ready.", false);
+          hideTimer = window.setTimeout(function hideBootText() {
+            bootNode.textContent = "";
+            syncVisibility();
+          }, 3500);
+        },
+        setDetail: function setDetailStatus(message) {
+          setDetail(message, false);
+        },
+        failDetail: function failDetailStatus(message) {
+          setDetail(message, true);
+        },
+        clearDetail: function clearDetailStatus() {
+          setDetail("", false);
         }
       };
 

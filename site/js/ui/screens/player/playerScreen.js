@@ -3663,9 +3663,12 @@ export const PlayerScreen = {
     const enabled = Boolean(globalThis.__NUVIO_BOOT_DEBUG__?.enabled);
     node.classList.toggle("hidden", !enabled);
     if (!enabled) {
+      globalThis.__NUVIO_BOOT_DEBUG__?.clearDetail?.();
       return;
     }
-    node.textContent = this.getPlayerDebugStateLabel();
+    const label = this.getPlayerDebugStateLabel();
+    globalThis.__NUVIO_BOOT_DEBUG__?.setDetail?.(label);
+    node.textContent = label;
   },
 
   updateUiTick() {
@@ -8006,6 +8009,7 @@ export const PlayerScreen = {
   },
 
   cleanup() {
+    globalThis.__NUVIO_BOOT_DEBUG__?.clearDetail?.();
     this.cancelSeekPreview({ commit: false });
     this.dismissPauseOverlay();
     this.pauseOverlayMetaRequestToken = Number(this.pauseOverlayMetaRequestToken || 0) + 1;
