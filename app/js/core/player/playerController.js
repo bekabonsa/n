@@ -784,25 +784,19 @@ export const PlayerController = {
     if (!avplay) {
       return;
     }
-    const displayTarget = document.getElementById("nuvioTizenAvplayHost") || this.video;
-    const rect = typeof displayTarget?.getBoundingClientRect === "function"
-      ? displayTarget.getBoundingClientRect()
-      : null;
     const documentWidth = Number(document.documentElement?.clientWidth || 0);
     const documentHeight = Number(document.documentElement?.clientHeight || 0);
     const screenWidth = Number(globalThis.screen?.width || 0);
     const screenHeight = Number(globalThis.screen?.height || 0);
-    const x = Math.max(0, Math.round(Number(rect?.left || 0)));
-    const y = Math.max(0, Math.round(Number(rect?.top || 0)));
-    const width = Math.max(1, Math.round(Math.max(Number(rect?.width || 0), Number(window.innerWidth || 0), documentWidth, screenWidth, 1920)));
-    const height = Math.max(1, Math.round(Math.max(Number(rect?.height || 0), Number(window.innerHeight || 0), documentHeight, screenHeight, 1080)));
+    const width = Math.max(1, Math.round(Math.max(Number(window.innerWidth || 0), documentWidth, screenWidth, 1920)));
+    const height = Math.max(1, Math.round(Math.max(Number(window.innerHeight || 0), documentHeight, screenHeight, 1080)));
     try {
-      avplay.setDisplayRect?.(x, y, width, height);
+      avplay.setDisplayRect?.(0, 0, width, height);
     } catch (_) {
       // Ignore display-rect failures.
     }
     try {
-      avplay.setDisplayMethod?.("PLAYER_DISPLAY_MODE_LETTER_BOX");
+      avplay.setDisplayMethod?.("PLAYER_DISPLAY_MODE_FULL_SCREEN");
     } catch (_) {
       // Ignore display-method failures.
     }
