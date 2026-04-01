@@ -7220,6 +7220,7 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  padding: 40px;
   padding: var(--tv-safe-gutter);
   opacity: 1;
   transition: opacity 200ms ease;
@@ -7291,6 +7292,7 @@ button:focus-visible {
 }
 
 .player-clock {
+  font-size: 36px;
   font-size: clamp(32px, 2.1vw, 40px);
   font-weight: 600;
   line-height: 1;
@@ -7298,6 +7300,7 @@ button:focus-visible {
 
 .player-ends-at {
   margin-top: 2px;
+  font-size: 16px;
   font-size: var(--tv-caption-text);
   color: rgba(231, 238, 246, 0.82);
 }
@@ -7305,9 +7308,11 @@ button:focus-visible {
 .player-controls-bottom {
   position: relative;
   z-index: 1;
+  padding-top: 80px;
   padding-top: clamp(68px, 7vh, 96px);
   display: flex;
   flex-direction: column;
+  gap: 16px;
   gap: var(--tv-card-gap);
 }
 
@@ -7317,6 +7322,7 @@ button:focus-visible {
 }
 
 .player-title {
+  font-size: 48px;
   font-size: clamp(40px, 2.8vw, 56px);
   font-weight: 700;
   line-height: 1.1;
@@ -7324,12 +7330,14 @@ button:focus-visible {
 
 .player-subtitle {
   margin-top: 4px;
+  font-size: 28px;
   font-size: var(--tv-subtitle-text);
   color: rgba(239, 245, 251, 0.9);
 }
 
 .player-meta-tertiary {
   margin-top: 6px;
+  font-size: 18px;
   font-size: var(--tv-secondary-text);
   color: rgba(255, 255, 255, 0.68);
 }
@@ -7345,6 +7353,7 @@ button:focus-visible {
   width: 100%;
   padding: 6px 0;
   outline: none;
+  min-width: 0;
 }
 
 .player-progress-track {
@@ -7370,40 +7379,58 @@ button:focus-visible {
 }
 
 .player-controls-row {
+  margin-top: 22px;
   margin-top: clamp(18px, 1.4vw, 28px);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 28px;
   gap: clamp(24px, 1.8vw, 36px);
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .player-control-buttons {
   display: flex;
   align-items: center;
+  gap: 14px;
   gap: clamp(12px, 1vw, 18px);
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .player-control-btn {
+  width: 64px;
   width: var(--tv-control-size);
+  min-width: 64px;
   min-width: var(--tv-control-size);
+  height: 64px;
   height: var(--tv-control-size);
   padding: 0;
   border-radius: 999px;
   border: none;
   background: transparent;
   color: #f4f8fd;
+  font-size: 18px;
   font-size: var(--tv-secondary-text);
   font-weight: 700;
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
+  overflow: hidden;
+  flex: 0 0 auto;
 }
 
 .player-control-icon {
+  width: 32px;
+  height: 32px;
   width: var(--tv-control-icon-size);
   height: var(--tv-control-icon-size);
   display: block;
+  object-fit: contain;
+  flex: 0 0 auto;
   filter: invert(1) brightness(1.15);
 }
 
@@ -7419,8 +7446,11 @@ button:focus-visible {
 }
 
 .player-control-label {
+  font-size: 17px;
   font-size: clamp(15px, 0.95vw, 18px);
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .player-control-btn.focused {
@@ -7453,10 +7483,13 @@ button:focus-visible {
 
 .player-time-label {
   margin-left: auto;
+  font-size: 24px;
   font-size: clamp(20px, 1.3vw, 26px);
   font-weight: 500;
   color: rgba(244, 248, 253, 0.96);
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .player-episode-panel {
@@ -7511,8 +7544,11 @@ button:focus-visible {
 
 .player-seek-overlay {
   position: absolute;
+  left: 40px;
   left: var(--tv-safe-gutter);
+  right: 40px;
   right: var(--tv-safe-gutter);
+  bottom: 40px;
   bottom: clamp(32px, 3vh, 48px);
   z-index: 33;
   padding: 0;
@@ -7537,12 +7573,14 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   gap: clamp(12px, 1vw, 18px);
   margin-top: 14px;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
 }
 
 .player-seek-direction {
+  font-size: 20px;
   font-size: var(--tv-secondary-text);
   font-weight: 700;
   color: rgba(246, 250, 255, 0.96);
@@ -7550,6 +7588,7 @@ button:focus-visible {
 }
 
 .player-seek-preview {
+  font-size: 20px;
   font-size: var(--tv-secondary-text);
   font-weight: 600;
   color: rgba(246, 250, 255, 0.96);
