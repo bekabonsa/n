@@ -1093,7 +1093,10 @@ export const PlayerScreen = {
     if (initialStreamUrl && !this.isExternalFrameMode()) {
       const sourceCandidate = this.getStreamCandidateByUrl(initialStreamUrl) || this.getCurrentStreamCandidate();
       this.activePlaybackUrl = initialStreamUrl;
-      PlayerController.play(this.activePlaybackUrl, this.buildPlaybackContext(sourceCandidate));
+      PlayerController.play(this.activePlaybackUrl, {
+        ...this.buildPlaybackContext(sourceCandidate),
+        forceEngine: this.getForcedPlaybackEngine(this.activePlaybackUrl, sourceCandidate)
+      });
       this.loadManifestTrackDataForCurrentStream(this.activePlaybackUrl);
       this.startTrackDiscoveryWindow();
     }
@@ -1168,6 +1171,33 @@ export const PlayerScreen = {
       requestHeaders,
       mediaSourceType
     };
+  },
+
+  getForcedPlaybackEngine(streamUrl, streamCandidate = this.getCurrentStreamCandidate()) {
+    if (!Platform.isTizen()) {
+      return null;
+    }
+    if (typeof PlayerController.canUseAvPlay !== "function" || !PlayerController.canUseAvPlay()) {
+      return null;
+    }
+
+    const mediaSourceType = String(
+      streamCandidate?.sourceType
+      || streamCandidate?.raw?.type
+      || streamCandidate?.raw?.mimeType
+      || PlayerController.guessMediaMimeType?.(streamUrl)
+      || ""
+    ).trim();
+
+    if (PlayerController.isLikelyHlsMimeType?.(mediaSourceType)
+      || PlayerController.isLikelyDashMimeType?.(mediaSourceType)
+      || PlayerController.isLikelySmoothStreamingMimeType?.(mediaSourceType)) {
+      return null;
+    }
+
+    return typeof PlayerController.getPlatformAvplayEngineName === "function"
+      ? PlayerController.getPlatformAvplayEngineName()
+      : "tizen-avplay";
   },
 
   buildSubtitleLookupContext() {
@@ -2157,7 +2187,10 @@ export const PlayerScreen = {
 
     this.activePlaybackUrl = targetUrl;
     const currentStreamCandidate = this.getCurrentStreamCandidate();
-    PlayerController.play(targetUrl, this.buildPlaybackContext(currentStreamCandidate));
+    PlayerController.play(targetUrl, {
+      ...this.buildPlaybackContext(currentStreamCandidate),
+      forceEngine: this.getForcedPlaybackEngine(targetUrl, currentStreamCandidate)
+    });
     this.paused = false;
     this.hasPresentedPlaybackFrame = false;
     this.loadingVisible = true;
@@ -4224,7 +4257,7 @@ export const PlayerScreen = {
     this.renderSpeedDialog();
     PlayerController.play(this.activePlaybackUrl, {
       ...this.buildPlaybackContext(sourceCandidate),
-      forceEngine
+      forceEngine: forceEngine || this.getForcedPlaybackEngine(this.activePlaybackUrl, sourceCandidate)
     });
     this.paused = false;
     this.loadSubtitles();

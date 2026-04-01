@@ -14984,7 +14984,9 @@
         if (initialStreamUrl && !this.isExternalFrameMode()) {
           const sourceCandidate = this.getStreamCandidateByUrl(initialStreamUrl) || this.getCurrentStreamCandidate();
           this.activePlaybackUrl = initialStreamUrl;
-          PlayerController.play(this.activePlaybackUrl, this.buildPlaybackContext(sourceCandidate));
+          PlayerController.play(this.activePlaybackUrl, __spreadProps(__spreadValues({}, this.buildPlaybackContext(sourceCandidate)), {
+            forceEngine: this.getForcedPlaybackEngine(this.activePlaybackUrl, sourceCandidate)
+          }));
           this.loadManifestTrackDataForCurrentStream(this.activePlaybackUrl);
           this.startTrackDiscoveryWindow();
         }
@@ -15054,6 +15056,22 @@
         requestHeaders,
         mediaSourceType
       };
+    },
+    getForcedPlaybackEngine(streamUrl, streamCandidate = this.getCurrentStreamCandidate()) {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      if (!Platform.isTizen()) {
+        return null;
+      }
+      if (typeof PlayerController.canUseAvPlay !== "function" || !PlayerController.canUseAvPlay()) {
+        return null;
+      }
+      const mediaSourceType = String(
+        (streamCandidate == null ? void 0 : streamCandidate.sourceType) || ((_a = streamCandidate == null ? void 0 : streamCandidate.raw) == null ? void 0 : _a.type) || ((_b = streamCandidate == null ? void 0 : streamCandidate.raw) == null ? void 0 : _b.mimeType) || ((_d = (_c = PlayerController).guessMediaMimeType) == null ? void 0 : _d.call(_c, streamUrl)) || ""
+      ).trim();
+      if (((_f = (_e = PlayerController).isLikelyHlsMimeType) == null ? void 0 : _f.call(_e, mediaSourceType)) || ((_h = (_g = PlayerController).isLikelyDashMimeType) == null ? void 0 : _h.call(_g, mediaSourceType)) || ((_j = (_i = PlayerController).isLikelySmoothStreamingMimeType) == null ? void 0 : _j.call(_i, mediaSourceType))) {
+        return null;
+      }
+      return typeof PlayerController.getPlatformAvplayEngineName === "function" ? PlayerController.getPlatformAvplayEngineName() : "tizen-avplay";
     },
     buildSubtitleLookupContext() {
       var _a, _b, _c, _d, _e;
@@ -15901,7 +15919,9 @@
       };
       this.activePlaybackUrl = targetUrl;
       const currentStreamCandidate = this.getCurrentStreamCandidate();
-      PlayerController.play(targetUrl, this.buildPlaybackContext(currentStreamCandidate));
+      PlayerController.play(targetUrl, __spreadProps(__spreadValues({}, this.buildPlaybackContext(currentStreamCandidate)), {
+        forceEngine: this.getForcedPlaybackEngine(targetUrl, currentStreamCandidate)
+      }));
       this.paused = false;
       this.hasPresentedPlaybackFrame = false;
       this.loadingVisible = true;
@@ -17726,7 +17746,7 @@
         this.renderAudioDialog();
         this.renderSpeedDialog();
         PlayerController.play(this.activePlaybackUrl, __spreadProps(__spreadValues({}, this.buildPlaybackContext(sourceCandidate)), {
-          forceEngine
+          forceEngine: forceEngine || this.getForcedPlaybackEngine(this.activePlaybackUrl, sourceCandidate)
         }));
         this.paused = false;
         this.loadSubtitles();
