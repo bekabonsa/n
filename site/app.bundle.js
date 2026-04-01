@@ -4595,12 +4595,12 @@
     return "browser";
   }
   function getAdapter() {
-    if (!Platform.current) {
-      Platform.current = ADAPTERS[detectPlatformName()];
+    if (!Platform2.current) {
+      Platform2.current = ADAPTERS[detectPlatformName()];
     }
-    return Platform.current;
+    return Platform2.current;
   }
-  var Platform = {
+  var Platform2 = {
     current: null,
     init() {
       var _a;
@@ -5543,7 +5543,7 @@
     const profileState = profile || {};
     const showProfileSelector = Boolean(profileState.showProfileSelector && profileState.activeProfileName);
     const collapsible = Boolean(layout == null ? void 0 : layout.collapseSidebar);
-    const performanceConstrained = Platform.isWebOS() || Platform.isTizen();
+    const performanceConstrained = Platform2.isWebOS() || Platform2.isTizen();
     return `
     <aside class="home-sidebar root-sidebar root-sidebar-legacy${performanceConstrained ? " performance-constrained" : ""}"
            data-selected-route="${selectedRoute}"
@@ -5583,7 +5583,7 @@
     const showProfileSelector = Boolean(profileState.showProfileSelector && profileState.activeProfileName);
     const { showPill, keepPillExpanded } = getModernSidebarPresentation();
     const selectedLabel = itemLabel(selectedItem);
-    const performanceConstrained = Platform.isWebOS() || Platform.isTizen();
+    const performanceConstrained = Platform2.isWebOS() || Platform2.isTizen();
     return `
     <div class="modern-sidebar-shell${expanded ? " expanded" : ""}${blurEnabled ? " blur-enabled" : ""}${keepPillExpanded ? " keep-pill-expanded" : ""}${performanceConstrained ? " performance-constrained" : ""}" data-selected-route="${selectedRoute}">
       ${showPill ? `
@@ -6198,7 +6198,7 @@
   }
   function getContinueWatchingMetaTimeout(timeoutMs) {
     const requestedTimeout = Math.max(500, Number(timeoutMs || 0) || CW_META_TIMEOUT_MS);
-    if (Platform.isWebOS() || Platform.isTizen()) {
+    if (Platform2.isWebOS() || Platform2.isTizen()) {
       return Math.max(requestedTimeout, CW_META_TIMEOUT_TV_MS);
     }
     return requestedTimeout;
@@ -7478,13 +7478,13 @@
     },
     isLegacyTvRuntime() {
       var _a, _b;
-      if (Platform.isTizen()) {
+      if (Platform2.isTizen()) {
         return true;
       }
-      if (!Platform.isWebOS()) {
+      if (!Platform2.isWebOS()) {
         return false;
       }
-      const webOsMajor = Number(((_b = (_a = Platform).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
+      const webOsMajor = Number(((_b = (_a = Platform2).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
       return webOsMajor > 0 && webOsMajor <= 5;
     },
     shouldSuppressAutomaticTrailerPlayback() {
@@ -7517,14 +7517,14 @@
         }
         return 5;
       }
-      if (Platform.isWebOS()) {
-        const webOsMajor = Number(((_b = (_a = Platform).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
+      if (Platform2.isWebOS()) {
+        const webOsMajor = Number(((_b = (_a = Platform2).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
         if (webOsMajor > 0 && webOsMajor <= 5) {
           return 4;
         }
         return Math.min(HOME_INITIAL_CATALOG_LOAD, 6);
       }
-      if (Platform.isTizen()) {
+      if (Platform2.isTizen()) {
         return Math.min(HOME_INITIAL_CATALOG_LOAD, 6);
       }
       return HOME_INITIAL_CATALOG_LOAD;
@@ -7534,14 +7534,14 @@
       if (this.isPerformanceConstrained()) {
         return 4;
       }
-      if (Platform.isWebOS()) {
-        const webOsMajor = Number(((_b = (_a = Platform).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
+      if (Platform2.isWebOS()) {
+        const webOsMajor = Number(((_b = (_a = Platform2).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
         if (webOsMajor > 0 && webOsMajor <= 5) {
           return 4;
         }
         return 8;
       }
-      if (Platform.isTizen()) {
+      if (Platform2.isTizen()) {
         return 8;
       }
       return 0;
@@ -10678,13 +10678,13 @@
       const currentFocusedNode = ((_a = this.container) == null ? void 0 : _a.querySelector(".focusable.focused")) || null;
       const code = Number((event == null ? void 0 : event.keyCode) || 0);
       const originalKeyCode = Number((event == null ? void 0 : event.originalKeyCode) || code || 0);
-      const isTizenHoldTarget = Platform.isTizen() && this.isContinueWatchingHoldTarget(currentFocusedNode);
+      const isTizenHoldTarget = Platform2.isTizen() && this.isContinueWatchingHoldTarget(currentFocusedNode);
       if (!isTizenHoldTarget || code !== 13) {
         this.cancelPendingContinueWatchingEnter();
         this.cancelPendingContinueWatchingHold();
       }
       if (this.continueWatchingMenu) {
-        if (Platform.isBackEvent(event)) {
+        if (Platform2.isBackEvent(event)) {
           (_b = event.preventDefault) == null ? void 0 : _b.call(event);
           this.closeContinueWatchingMenu();
           return;
@@ -10701,7 +10701,7 @@
         }
         return;
       }
-      if (Platform.isBackEvent(event)) {
+      if (Platform2.isBackEvent(event)) {
         (_e = event.preventDefault) == null ? void 0 : _e.call(event);
         if (this.layoutMode === "modern") {
           this.cancelFocusedPosterFlow();
@@ -10711,7 +10711,7 @@
           ((_f = this.container) == null ? void 0 : _f.querySelector(".modern-sidebar-panel .focusable.focused")) || ((_g = this.container) == null ? void 0 : _g.querySelector(".home-sidebar .focusable.focused"))
         );
         if (sidebarFocused) {
-          Platform.exitApp();
+          Platform2.exitApp();
         } else {
           this.openSidebar();
         }
@@ -10741,7 +10741,7 @@
         this.openContinueWatchingMenu(currentFocusedNode);
         return;
       }
-      if (Platform.isTizen() && code === 13 && isContinueWatchingHoldTarget) {
+      if (Platform2.isTizen() && code === 13 && isContinueWatchingHoldTarget) {
         (_j = event.preventDefault) == null ? void 0 : _j.call(event);
         if (!(event == null ? void 0 : event.repeat) && !this.hasPendingContinueWatchingHold(currentFocusedNode)) {
           this.startPendingContinueWatchingHold(currentFocusedNode);
@@ -10778,7 +10778,7 @@
     },
     onKeyUp(event) {
       var _a, _b;
-      if (!Platform.isTizen()) {
+      if (!Platform2.isTizen()) {
         return;
       }
       if (Number((event == null ? void 0 : event.keyCode) || 0) !== 13) {
@@ -11187,7 +11187,7 @@
       return message.includes("no supported source") || message.includes("no supported sources") || message.includes("not supported");
     },
     getPlatformAvplayEngine() {
-      return resolvePlatformAvplayEngine(Platform.getName());
+      return resolvePlatformAvplayEngine(Platform2.getName());
     },
     getPlatformAvplayEngineName() {
       return this.getPlatformAvplayEngine().name;
@@ -11217,7 +11217,7 @@
       return String(this.playbackEngine || "").startsWith("native");
     },
     refreshWebOsDeviceInfo() {
-      if (!Platform.isWebOS()) {
+      if (!Platform2.isWebOS()) {
         return Promise.resolve({
           unsupportedAudioCodecs: this.getWebOsUnsupportedAudioCodecs()
         });
@@ -11300,7 +11300,7 @@
       }
     },
     requestWebOsMediaCommand(method, parameters = {}) {
-      if (!Platform.isWebOS() || !WebOsLunaService.isAvailable()) {
+      if (!Platform2.isWebOS() || !WebOsLunaService.isAvailable()) {
         return Promise.reject(new Error("webOS Luna media service unavailable"));
       }
       return WebOsLunaService.request("luna://com.webos.media", {
@@ -11323,7 +11323,7 @@
       return this.nativeMediaId;
     },
     waitForNativeMediaId({ maxAttempts = 4, intervalMs = 300 } = {}) {
-      if (!Platform.isWebOS() || !this.video || !this.isUsingNativePlayback()) {
+      if (!Platform2.isWebOS() || !this.video || !this.isUsingNativePlayback()) {
         return Promise.resolve(null);
       }
       const existingMediaId = this.syncNativeMediaId();
@@ -12035,12 +12035,12 @@
     },
     shouldPreferAvPlayForTizenSource(url, sourceType = null) {
       const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
-      return Platform.isTizen() && this.canUseAvPlay() && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+      return Platform2.isTizen() && this.canUseAvPlay() && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
     },
     getPlaybackEngineCandidates(url, sourceType = null, itemType = this.currentItemType) {
       const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
       const avplayEngine = this.getPlatformAvplayEngineName();
-      const isTizenRuntime = Platform.isTizen();
+      const isTizenRuntime = Platform2.isTizen();
       const preferAvPlayForTizenSource = this.shouldPreferAvPlayForTizenSource(url, normalizedSourceType);
       const isLivePlayback = this.isLivePlaybackItemType(itemType);
       const canUseAvPlay = this.canUseAvPlay();
@@ -12083,7 +12083,7 @@
         if (isTizenRuntime && canUseDashJs) {
           pushCandidate(candidates2, "dash.js");
         }
-        if (Platform.isWebOS() && canPlayNativeDash) {
+        if (Platform2.isWebOS() && canPlayNativeDash) {
           pushCandidate(candidates2, "native-dash");
         }
         if (!isTizenRuntime && canUseDashJs) {
@@ -12260,7 +12260,7 @@
     },
     buildHlsConfig(requestHeaders = {}) {
       const forwardedHeaders = this.normalizePlaybackHeaders(requestHeaders);
-      const isWebOs = Platform.isWebOS();
+      const isWebOs = Platform2.isWebOS();
       return {
         enableWorker: !isWebOs,
         lowLatencyMode: false,
@@ -12404,7 +12404,7 @@
         if (!player) {
           return false;
         }
-        const isWebOs = Platform.isWebOS();
+        const isWebOs = Platform2.isWebOS();
         (_a = player.updateSettings) == null ? void 0 : _a.call(player, {
           streaming: {
             fastSwitchEnabled: !isWebOs,
@@ -12663,7 +12663,7 @@
       return true;
     },
     setWebOsEmbeddedAudioTrack(trackIndex) {
-      if (!Platform.isWebOS() || !this.video || !this.isUsingNativePlayback()) {
+      if (!Platform2.isWebOS() || !this.video || !this.isUsingNativePlayback()) {
         return false;
       }
       const targetIndex = Number(trackIndex);
@@ -12755,7 +12755,7 @@
       }
       this.selectedWebOsEmbeddedSubtitleTrackIndex = -1;
       const mediaId = this.syncNativeMediaId();
-      if (mediaId && Platform.isWebOS()) {
+      if (mediaId && Platform2.isWebOS()) {
         if (targetIndex < 0) {
           this.requestWebOsMediaCommand("setSubtitleEnable", {
             mediaId,
@@ -12790,7 +12790,7 @@
       return true;
     },
     setWebOsEmbeddedSubtitleTrack(trackIndex) {
-      if (!Platform.isWebOS() || !this.video || !this.isUsingNativePlayback()) {
+      if (!Platform2.isWebOS() || !this.video || !this.isUsingNativePlayback()) {
         return false;
       }
       const targetIndex = Number(trackIndex);
@@ -12912,7 +12912,7 @@
     },
     init() {
       this.video = document.getElementById("videoPlayer");
-      Platform.prepareVideoElement(this.video);
+      Platform2.prepareVideoElement(this.video);
       this.video.muted = false;
       this.video.defaultMuted = false;
       this.video.volume = 1;
@@ -12961,7 +12961,7 @@
         const audioTrackCount = Number((audioTrackList == null ? void 0 : audioTrackList.length) || 0);
         const probeUrl = String(this.currentPlaybackUrl || ((_d = this.video) == null ? void 0 : _d.currentSrc) || ((_e = this.video) == null ? void 0 : _e.src) || "").trim();
         const isDirectFile = this.isLikelyDirectFileUrl(probeUrl);
-        if (this.isUsingNativePlayback() && isDirectFile && audioTrackCount <= 0 && Platform.isWebOS() && this.canUseAvPlay()) {
+        if (this.isUsingNativePlayback() && isDirectFile && audioTrackCount <= 0 && Platform2.isWebOS() && this.canUseAvPlay()) {
           this.forceAvPlayFallbackForCurrentSource("native_playing_no_audio_tracks");
         }
       });
@@ -12974,7 +12974,7 @@
         const probeUrl = String(this.currentPlaybackUrl || ((_g = this.video) == null ? void 0 : _g.currentSrc) || ((_h = this.video) == null ? void 0 : _h.src) || "").trim();
         const isDirectFile = this.isLikelyDirectFileUrl(probeUrl);
         const fallbackTried = this.avplayFallbackAttempts.has(probeUrl);
-        if (this.isUsingNativePlayback() && isDirectFile && audioTrackCount <= 0 && Platform.isWebOS() && this.canUseAvPlay()) {
+        if (this.isUsingNativePlayback() && isDirectFile && audioTrackCount <= 0 && Platform2.isWebOS() && this.canUseAvPlay()) {
           this.forceAvPlayFallbackForCurrentSource("native_no_audio_tracks");
         }
       });
@@ -13347,7 +13347,7 @@
   }
   function waitForTizenMediaService() {
     return __async(this, null, function* () {
-      if (!Platform.isTizen()) {
+      if (!Platform2.isTizen()) {
         return;
       }
       const readiness = globalThis.__NUVIO_TIZEN_MEDIA_SERVICE_READY__;
@@ -13400,7 +13400,7 @@
           return Array.isArray(sharedTracks) ? sharedTracks.slice() : [];
         }
         const requestPromise = (() => __async(null, null, function* () {
-          if (Platform.isWebOS() && WebOsLunaService.isAvailable()) {
+          if (Platform2.isWebOS() && WebOsLunaService.isAvailable()) {
             try {
               const lunaTracks = yield requestTracksViaLuna(targetUrl);
               tracksCache.set(targetUrl, {
@@ -13411,7 +13411,7 @@
             } catch (_) {
             }
           }
-          if (Platform.isTizen()) {
+          if (Platform2.isTizen()) {
             yield waitForTizenMediaService();
           }
           for (const port of getCandidatePorts()) {
@@ -14034,19 +14034,19 @@
   // js/platform/environment.js
   var Environment = {
     isWebOS() {
-      return Platform.isWebOS();
+      return Platform2.isWebOS();
     },
     isTizen() {
-      return Platform.isTizen();
+      return Platform2.isTizen();
     },
     isBrowser() {
-      return Platform.isBrowser();
+      return Platform2.isBrowser();
     },
     isBackEvent(event) {
-      return Platform.isBackEvent(event);
+      return Platform2.isBackEvent(event);
     },
     getDeviceLabel() {
-      return Platform.getDeviceLabel();
+      return Platform2.getDeviceLabel();
     }
   };
 
@@ -17166,6 +17166,8 @@
       const statusText = String(this.sourcesError || "").trim();
       const engine = String(PlayerController.playbackEngine || "none").trim() || "none";
       const requestedEngine = typeof PlayerController.getRequestedPlaybackEngine === "function" ? PlayerController.getRequestedPlaybackEngine() : engine;
+      const platformName = typeof (Platform == null ? void 0 : Platform.getName) === "function" ? Platform.getName() : "unknown";
+      const avplaySupported = typeof PlayerController.canUseAvPlay === "function" ? PlayerController.canUseAvPlay() : false;
       const errorCode = typeof PlayerController.getLastPlaybackErrorCode === "function" ? Number(PlayerController.getLastPlaybackErrorCode() || 0) : 0;
       const failureDetail = typeof PlayerController.getLastPlaybackFailureDetail === "function" ? PlayerController.getLastPlaybackFailureDetail() : "";
       let state = "PLAYING";
@@ -17196,6 +17198,8 @@
       }
       return [
         `state=${state}`,
+        `platform=${platformName}`,
+        `avplay=${avplaySupported ? "yes" : "no"}`,
         `requested=${requestedEngine}`,
         `engine=${engine}`,
         `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
@@ -21072,10 +21076,10 @@ ${normalized}`;
 
   // js/core/auth/authNavigation.js
   function getPrimarySignInRoute() {
-    return Platform.isBrowser() ? "authSignIn" : "authQrSignIn";
+    return Platform2.isBrowser() ? "authSignIn" : "authQrSignIn";
   }
   function getSignedOutLandingRoute() {
-    return Platform.isBrowser() ? "authSignIn" : "authQrSignIn";
+    return Platform2.isBrowser() ? "authSignIn" : "authQrSignIn";
   }
 
   // js/ui/screens/account/accountScreen.js
@@ -21127,10 +21131,10 @@ ${normalized}`;
         this.container.innerHTML = `
         <div class="account-shell">
           <h1 class="account-title">${I18n.t("auth.account.title")}</h1>
-          <p class="account-subtitle">${Platform.isBrowser() ? I18n.t("auth.account.signInBrowserCopy", {}, { fallback: "Sign in to sync your addons, profiles, and account resources." }) : I18n.t("auth.account.signInCopy")}</p>
+          <p class="account-subtitle">${Platform2.isBrowser() ? I18n.t("auth.account.signInBrowserCopy", {}, { fallback: "Sign in to sync your addons, profiles, and account resources." }) : I18n.t("auth.account.signInCopy")}</p>
           <div class="account-card focusable" data-action="signin">
-            <h3 class="account-card-title">${Platform.isBrowser() ? I18n.t("auth.account.signInBrowser", {}, { fallback: "Sign In" }) : I18n.t("auth.account.signIn")}</h3>
-            <p class="account-card-subtitle">${Platform.isBrowser() ? I18n.t("auth.account.signInBrowserSubtitle", {}, { fallback: "Use your account email and password to load synced resources." }) : I18n.t("auth.account.signInSubtitle")}</p>
+            <h3 class="account-card-title">${Platform2.isBrowser() ? I18n.t("auth.account.signInBrowser", {}, { fallback: "Sign In" }) : I18n.t("auth.account.signIn")}</h3>
+            <p class="account-card-subtitle">${Platform2.isBrowser() ? I18n.t("auth.account.signInBrowserSubtitle", {}, { fallback: "Use your account email and password to load synced resources." }) : I18n.t("auth.account.signInSubtitle")}</p>
           </div>
         </div>
       `;
@@ -24817,7 +24821,7 @@ ${normalized}`;
         const originalKeyCode = Number((event == null ? void 0 : event.originalKeyCode) || code || 0);
         const overlayRoot = this.container.querySelector("[data-overlay-root='pin']") || this.container.querySelector("[data-overlay-root='delete']") || this.container.querySelector("[data-overlay-root='options']") || this.container.querySelector("[data-overlay-root='editor']");
         const currentProfileCard = this.container.querySelector(".profile-card.focused") || null;
-        if (!Platform.isTizen() || code !== 13 || !this.canHoldManageProfile(currentProfileCard)) {
+        if (!Platform2.isTizen() || code !== 13 || !this.canHoldManageProfile(currentProfileCard)) {
           this.cancelPendingProfileHold();
         }
         if (overlayRoot) {
@@ -24856,7 +24860,7 @@ ${normalized}`;
             }
           }
         }
-        if (Platform.isTizen() && code === 13 && this.canHoldManageProfile(currentProfileCard)) {
+        if (Platform2.isTizen() && code === 13 && this.canHoldManageProfile(currentProfileCard)) {
           (_d = event == null ? void 0 : event.preventDefault) == null ? void 0 : _d.call(event);
           if (!(event == null ? void 0 : event.repeat) && !this.hasPendingProfileHold(currentProfileCard)) {
             this.startPendingProfileHold(currentProfileCard);
@@ -24880,7 +24884,7 @@ ${normalized}`;
     onKeyUp(event) {
       return __async(this, null, function* () {
         var _a, _b;
-        if (!Platform.isTizen()) {
+        if (!Platform2.isTizen()) {
           return;
         }
         if (Number((event == null ? void 0 : event.keyCode) || 0) !== 13 || this.pinOverlayState || this.optionsProfileId || this.deleteProfileId || this.editorState) {
@@ -27377,7 +27381,7 @@ ${normalized}`;
       if (!Environment.isWebOS()) {
         return false;
       }
-      const webOsMajor = Number(((_b = (_a = Platform).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
+      const webOsMajor = Number(((_b = (_a = Platform2).getWebOsMajorVersion) == null ? void 0 : _b.call(_a)) || 0);
       return webOsMajor > 0 && webOsMajor <= 5;
     },
     shouldSuppressTrailerAutoplay() {
@@ -31394,7 +31398,7 @@ ${normalized}`;
             return;
           }
           if (this.focusZone === "sidebar") {
-            Platform.exitApp();
+            Platform2.exitApp();
           } else {
             yield this.focusSidebarNode();
           }
@@ -32565,10 +32569,10 @@ ${normalized}`;
     onKeyDown(event) {
       return __async(this, null, function* () {
         var _a, _b, _c, _d, _e, _f;
-        if (Platform.isBackEvent(event)) {
+        if (Platform2.isBackEvent(event)) {
           (_a = event.preventDefault) == null ? void 0 : _a.call(event);
           if (this.focusZone === "sidebar") {
-            Platform.exitApp();
+            Platform2.exitApp();
           } else {
             yield this.openSidebar();
           }
@@ -33587,14 +33591,14 @@ ${normalized}`;
     onKeyDown(event) {
       return __async(this, null, function* () {
         var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-        if (Platform.isBackEvent(event)) {
+        if (Platform2.isBackEvent(event)) {
           (_a = event == null ? void 0 : event.preventDefault) == null ? void 0 : _a.call(event);
           if (this.openPicker) {
             this.closePickerMenu();
             return;
           }
           if (this.focusZone === "sidebar") {
-            Platform.exitApp();
+            Platform2.exitApp();
           } else {
             yield this.openSidebar();
           }
@@ -34672,8 +34676,8 @@ ${normalized}`;
               </div>` : `<p class="settings-account-note">${t8("settings.account.syncNote")}</p>
               ${this.renderActionRow({
         focusKey: "account:signin",
-        title: Platform.isBrowser() ? t8("settings.account.signInBrowser", {}, "Sign In") : t8("settings.account.signInWithQr"),
-        subtitle: Platform.isBrowser() ? t8("settings.account.signInBrowserSubtitle", {}, "Sign in to sync your addons, profiles, and resources.") : t8("settings.account.signInWithQrSubtitle")
+        title: Platform2.isBrowser() ? t8("settings.account.signInBrowser", {}, "Sign In") : t8("settings.account.signInWithQr"),
+        subtitle: Platform2.isBrowser() ? t8("settings.account.signInBrowserSubtitle", {}, "Sign in to sync your addons, profiles, and resources.") : t8("settings.account.signInWithQrSubtitle")
       })}`}
           ${signedIn ? this.renderActionRow({
         focusKey: "account:signout",
@@ -35831,7 +35835,7 @@ ${normalized}`;
     onKeyDown(event) {
       return __async(this, null, function* () {
         var _a, _b, _c, _d;
-        if (Platform.isBackEvent(event)) {
+        if (Platform2.isBackEvent(event)) {
           (_a = event == null ? void 0 : event.preventDefault) == null ? void 0 : _a.call(event);
           if (this.optionDialog) {
             this.closeOptionDialog();
@@ -35839,7 +35843,7 @@ ${normalized}`;
             return;
           }
           if (this.focusZone === "sidebar") {
-            Platform.exitApp();
+            Platform2.exitApp();
           } else {
             yield this.openSidebar();
           }
@@ -36452,7 +36456,7 @@ ${normalized}`;
       return __async(this, null, function* () {
         var _a, _b, _c, _d, _e, _f, _g, _h, _i;
         if (this.qrOverlayOpen) {
-          if (Platform.isBackEvent(event)) {
+          if (Platform2.isBackEvent(event)) {
             (_a = event == null ? void 0 : event.preventDefault) == null ? void 0 : _a.call(event);
             yield this.closeQrOverlay();
             return;
@@ -36464,10 +36468,10 @@ ${normalized}`;
           }
           return;
         }
-        if (Platform.isBackEvent(event)) {
+        if (Platform2.isBackEvent(event)) {
           (_c = event == null ? void 0 : event.preventDefault) == null ? void 0 : _c.call(event);
           if (this.focusZone === "sidebar") {
-            Platform.exitApp();
+            Platform2.exitApp();
           } else {
             yield this.openSidebar();
           }
@@ -36740,7 +36744,7 @@ ${normalized}`;
     onKeyDown(event) {
       return __async(this, null, function* () {
         var _a, _b;
-        if (Platform.isBackEvent(event)) {
+        if (Platform2.isBackEvent(event)) {
           (_a = event == null ? void 0 : event.preventDefault) == null ? void 0 : _a.call(event);
           yield Router.back();
           return;
@@ -38506,7 +38510,7 @@ ${normalized}`;
         }
         const state = (event == null ? void 0 : event.state) || null;
         if (this.current === "home" && (!(state == null ? void 0 : state.route) || NON_BACKSTACK_ROUTES.has(state.route))) {
-          Platform.exitApp();
+          Platform2.exitApp();
           return;
         }
         if ((state == null ? void 0 : state.route) && this.routes[state.route]) {
@@ -38583,7 +38587,7 @@ ${normalized}`;
           return;
         }
         if (this.current === "home") {
-          Platform.exitApp();
+          Platform2.exitApp();
           return;
         }
         if ((window == null ? void 0 : window.history) && typeof window.history.back === "function" && this.historyInitialized) {
@@ -38598,7 +38602,7 @@ ${normalized}`;
             yield this.routes.home.mount();
             return;
           }
-          Platform.exitApp();
+          Platform2.exitApp();
           return;
         }
         const previous = this.stack.pop();
@@ -38630,7 +38634,7 @@ ${normalized}`;
 
   // js/ui/navigation/focusEngine.js
   function buildNormalizedEvent(event) {
-    const normalizedKey = Platform.normalizeKey(event);
+    const normalizedKey = Platform2.normalizeKey(event);
     const normalizedCode = Number(normalizedKey.keyCode || 0);
     return {
       key: normalizedKey.key,
@@ -38676,7 +38680,7 @@ ${normalized}`;
         return;
       }
       const normalizedEvent = buildNormalizedEvent(event);
-      if (Platform.isBackEvent({
+      if (Platform2.isBackEvent({
         target: (event == null ? void 0 : event.target) || null,
         key: (event == null ? void 0 : event.key) || "",
         code: (event == null ? void 0 : event.code) || "",
@@ -39313,7 +39317,7 @@ ${normalized}`;
     return lowCpu || lowMem;
   }
   function applyPerformanceMode() {
-    const constrained = Platform.isWebOS() || Platform.isTizen() || isLowEndDevice();
+    const constrained = Platform2.isWebOS() || Platform2.isTizen() || isLowEndDevice();
     document.documentElement.classList.toggle("performance-constrained", constrained);
     document.body.classList.toggle("performance-constrained", constrained);
   }
@@ -39330,8 +39334,8 @@ ${normalized}`;
       setBootDebugStatus("Rendering app shell...");
       renderAppShell();
       setBootDebugStatus("Initializing platform...");
-      Platform.init();
-      setBootDebugStatus(`Platform ready: ${Platform.getName()}. Applying performance mode...`);
+      Platform2.init();
+      setBootDebugStatus(`Platform ready: ${Platform2.getName()}. Applying performance mode...`);
       applyPerformanceMode();
       setBootDebugStatus("Loading translations...");
       yield I18n.init();

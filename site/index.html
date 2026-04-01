@@ -12,6 +12,18 @@
 </head>
 <body>
   <script>
+    (function initPlatformOverrideFromQuery() {
+      var root = typeof globalThis !== "undefined" ? globalThis : window;
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var explicitPlatform = String(params.get("platform") || params.get("wrapper") || "").trim().toLowerCase();
+        if (explicitPlatform === "tizen" || explicitPlatform === "webos" || explicitPlatform === "browser") {
+          root.__NUVIO_PLATFORM__ = explicitPlatform;
+        }
+      } catch (_) {}
+    }());
+  </script>
+  <script>
     (function initBootDebug() {
       var root = typeof globalThis !== "undefined" ? globalThis : window;
       var enabled = false;

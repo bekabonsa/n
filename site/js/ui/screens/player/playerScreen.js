@@ -3644,6 +3644,12 @@ export const PlayerScreen = {
     const requestedEngine = typeof PlayerController.getRequestedPlaybackEngine === "function"
       ? PlayerController.getRequestedPlaybackEngine()
       : engine;
+    const platformName = typeof Platform?.getName === "function"
+      ? Platform.getName()
+      : "unknown";
+    const avplaySupported = typeof PlayerController.canUseAvPlay === "function"
+      ? PlayerController.canUseAvPlay()
+      : false;
     const errorCode = typeof PlayerController.getLastPlaybackErrorCode === "function"
       ? Number(PlayerController.getLastPlaybackErrorCode() || 0)
       : 0;
@@ -3680,6 +3686,8 @@ export const PlayerScreen = {
 
     return [
       `state=${state}`,
+      `platform=${platformName}`,
+      `avplay=${avplaySupported ? "yes" : "no"}`,
       `requested=${requestedEngine}`,
       `engine=${engine}`,
       `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
