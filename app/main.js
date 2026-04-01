@@ -1,12 +1,21 @@
 (function openHostedNuvioTvBuild() {
   var hostedAppUrl = "https://raw.githack.com/bekabonsa/n/main/site/index.html";
-  var launcherBuild = "main-auto";
+  var hostedBuildInfoUrl = "https://raw.githack.com/bekabonsa/n/main/site/build-info.json";
+  var launcherBuild = "main-pending";
   var tvInput = window.tizen && window.tizen.tvinputdevice;
   var buildNode = document.getElementById("launcher-build");
 
-  if (buildNode) {
-    buildNode.textContent = "launcher " + launcherBuild;
+  function updateBuildLabel(nextLabel) {
+    if (!nextLabel) {
+      return;
+    }
+    launcherBuild = nextLabel;
+    if (buildNode) {
+      buildNode.textContent = "launcher " + launcherBuild;
+    }
   }
+
+  updateBuildLabel(launcherBuild);
 
   function buildFreshHostedUrl() {
     try {
@@ -22,6 +31,27 @@
     }
   }
 
+  function resolveHostedBuildLabel() {
+    return fetch(hostedBuildInfoUrl + "?_cb=" + encodeURIComponent(String(Date.now())))
+      .then(function onResponse(response) {
+        if (!response.ok) {
+          throw new Error("Failed to load build info");
+        }
+        return response.json();
+      })
+      .then(function onJson(payload) {
+        var builtAt = payload && payload.builtAt ? String(payload.builtAt).trim() : "";
+        if (builtAt) {
+          updateBuildLabel(builtAt);
+        } else {
+          updateBuildLabel("main-unknown-time");
+        }
+      })
+      .catch(function onError() {
+        updateBuildLabel("main-build-info-unavailable");
+      });
+  }
+
   if (tvInput && typeof tvInput.registerKey === "function") {
     ["MediaPlay", "MediaPause", "MediaPlayPause", "MediaFastForward", "MediaRewind"].forEach(function registerKey(keyName) {
       try {
@@ -30,7 +60,13 @@
     });
   }
 
-  setTimeout(function redirectToHostedBuild() {
-    window.location.replace(buildFreshHostedUrl());
-  }, 700);
+  resolveHostedBuildLabel().then(function finalizeLauncher() {
+    setTimeout(function redirectToHostedBuild() {
+      window.location.replace(buildFreshHostedUrl());
+    }, 700);
+  }, function finalizeLauncher() {
+    setTimeout(function redirectToHostedBuild() {
+      window.location.replace(buildFreshHostedUrl());
+    }, 700);
+  });
 }());

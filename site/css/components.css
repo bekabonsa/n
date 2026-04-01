@@ -7160,10 +7160,12 @@ button:focus-visible {
 }
 
 .player-loading-overlay.logo-only .player-loading-center {
+  width: 320px;
   width: auto;
 }
 
 .player-loading-overlay.logo-only .player-loading-logo {
+  max-width: 320px;
   margin-bottom: 0;
 }
 
@@ -7187,8 +7189,11 @@ button:focus-visible {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
+  width: 820px;
   width: min(80vw, 900px);
   text-align: center;
+  max-width: calc(100vw - 96px);
+  box-sizing: border-box;
 }
 
 .player-loading-logo {
@@ -7645,7 +7650,9 @@ button:focus-visible {
 
 .player-pause-overlay-top {
   position: absolute;
+  top: 40px;
   top: var(--tv-safe-gutter);
+  right: 40px;
   right: var(--tv-safe-gutter);
   text-align: right;
   z-index: 1;
@@ -7654,6 +7661,7 @@ button:focus-visible {
 }
 
 .player-pause-overlay-clock {
+  font-size: 36px;
   font-size: clamp(32px, 2.1vw, 40px);
   font-weight: 560;
   line-height: 1;
@@ -7661,6 +7669,7 @@ button:focus-visible {
 
 .player-pause-overlay-ends-at {
   margin-top: 2px;
+  font-size: 16px;
   font-size: var(--tv-caption-text);
   color: rgba(255, 255, 255, 0.68);
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.32);
@@ -7668,19 +7677,24 @@ button:focus-visible {
 
 .player-pause-overlay-content {
   position: absolute;
+  left: 40px;
   left: var(--tv-safe-gutter);
   top: 50%;
   transform: translateY(-50%);
+  right: 360px;
   right: min(28vw, 460px);
+  max-width: 760px;
   max-width: min(48vw, 820px);
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 14px;
   text-shadow: 0 4px 22px rgba(0, 0, 0, 0.62);
+  box-sizing: border-box;
 }
 
 .player-pause-kicker {
+  font-size: 16px;
   font-size: var(--tv-caption-text);
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -7689,6 +7703,7 @@ button:focus-visible {
 }
 
 .player-pause-logo {
+  max-width: 440px;
   max-width: min(38vw, 520px);
   max-height: 120px;
   object-fit: contain;
@@ -7697,6 +7712,7 @@ button:focus-visible {
 }
 
 .player-pause-title {
+  font-size: 52px;
   font-size: clamp(44px, 3vw, 62px);
   font-weight: 740;
   line-height: 1.05;
@@ -7704,12 +7720,14 @@ button:focus-visible {
 }
 
 .player-pause-meta-line {
+  font-size: 18px;
   font-size: var(--tv-secondary-text);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.72);
 }
 
 .player-pause-episode-title {
+  font-size: 32px;
   font-size: clamp(28px, 1.9vw, 38px);
   font-weight: 650;
   line-height: 1.12;
@@ -7717,7 +7735,9 @@ button:focus-visible {
 }
 
 .player-pause-description {
+  max-width: 720px;
   max-width: min(46vw, 760px);
+  font-size: 22px;
   font-size: clamp(20px, 1.3vw, 26px);
   line-height: 1.42;
   color: rgba(255, 255, 255, 0.8);
