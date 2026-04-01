@@ -1,4 +1,4 @@
-# Nuvio-TIZEN
+# n
 
 Hosted TizenBrew wrapper for a Nuvio TV test build.
 
@@ -24,4 +24,8 @@ npm run sync:tizenbrew -- --path /absolute/path/to/Nuvio-TIZEN --env-source /abs
 
 ## Install in TizenBrew
 
-Push this repo to GitHub, then add it as a GitHub module from the TizenBrew module manager.
+Add this GitHub module in TizenBrew:
+
+```text
+bekabonsa/n
+```

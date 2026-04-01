@@ -1,5 +1,5 @@
 (function openHostedNuvioTvBuild() {
-  var hostedAppUrl = "https://cdn.jsdelivr.net/gh/bekabonsa/Nuvio-TIZEN/site/index.html";
+  var hostedAppUrl = "https://cdn.jsdelivr.net/gh/bekabonsa/n/site/index.html";
   var tvInput = window.tizen && window.tizen.tvinputdevice;
 
   function buildFreshHostedUrl() {
