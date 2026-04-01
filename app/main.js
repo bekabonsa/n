@@ -1,7 +1,8 @@
 (function openHostedNuvioTvBuild() {
-  var hostedAppUrl = "https://raw.githack.com/bekabonsa/n/main/site/index.html";
-  var hostedBuildInfoUrl = "https://raw.githack.com/bekabonsa/n/main/site/build-info.json";
-  var launcherBuild = "main-pending";
+  var hostedSiteRevision = "cd23fa8";
+  var hostedAppUrl = "https://rawcdn.githack.com/bekabonsa/n/" + hostedSiteRevision + "/site/index.html";
+  var hostedBuildInfoUrl = "https://rawcdn.githack.com/bekabonsa/n/" + hostedSiteRevision + "/site/build-info.json";
+  var launcherBuild = hostedSiteRevision;
   var tvInput = window.tizen && window.tizen.tvinputdevice;
   var buildNode = document.getElementById("launcher-build");
 
@@ -43,12 +44,10 @@
         var builtAt = payload && payload.builtAt ? String(payload.builtAt).trim() : "";
         if (builtAt) {
           updateBuildLabel(builtAt);
-        } else {
-          updateBuildLabel("main-unknown-time");
         }
       })
       .catch(function onError() {
-        updateBuildLabel("main-build-info-unavailable");
+        updateBuildLabel(hostedSiteRevision + "-build-info-unavailable");
       });
   }
 
