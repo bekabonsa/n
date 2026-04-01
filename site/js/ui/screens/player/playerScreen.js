@@ -7,6 +7,7 @@ import { skipIntroRepository } from "../../../data/repository/skipIntroRepositor
 import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
 import { metaRepository } from "../../../data/repository/metaRepository.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
 import { Environment } from "../../../platform/environment.js";
 import { Router } from "../../navigation/router.js";
 
