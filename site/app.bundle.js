@@ -2213,7 +2213,9 @@
       return fallback;
     }
     const unsigned = parsed >>> 0;
-    return `#${unsigned.toString(16).slice(-6).padStart(6, "0")}`;
+    const hex = unsigned.toString(16).slice(-6);
+    const paddedHex = hex.length >= 6 ? hex : `${"000000".slice(hex.length)}${hex}`;
+    return `#${paddedHex}`;
   }
   function buildComparableFeaturesFromBlob(blob = {}) {
     return SUPPORTED_FEATURE_NAMES.reduce((accumulator, featureName) => {
@@ -14322,10 +14324,11 @@
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor(total % 3600 / 60);
     const seconds = total % 60;
+    const formatTwoDigits = (value) => value < 10 ? `0${value}` : String(value);
     if (hours > 0) {
-      return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
     }
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    return `${minutes}:${formatTwoDigits(seconds)}`;
   }
   function formatClock(date = /* @__PURE__ */ new Date()) {
     const locale = typeof I18n.getLocale === "function" ? I18n.getLocale() : void 0;
@@ -25369,10 +25372,11 @@ ${normalized}`;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor(totalSeconds % 3600 / 60);
     const seconds = totalSeconds % 60;
+    const formatTwoDigits = (numericValue) => numericValue < 10 ? `0${numericValue}` : String(numericValue);
     if (hours > 0) {
-      return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
     }
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    return `${minutes}:${formatTwoDigits(seconds)}`;
   }
   function normalizeTrailerProxyStatePayload(payload, fallbackMuted = false) {
     const source = payload && typeof payload === "object" ? payload : {};

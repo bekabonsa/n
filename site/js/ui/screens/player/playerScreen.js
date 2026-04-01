@@ -473,10 +473,11 @@ function formatTime(secondsValue) {
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
+  const formatTwoDigits = (value) => (value < 10 ? `0${value}` : String(value));
   if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
   }
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  return `${minutes}:${formatTwoDigits(seconds)}`;
 }
 
 function formatClock(date = new Date()) {
