@@ -7,6 +7,7 @@ import { skipIntroRepository } from "../../../data/repository/skipIntroRepositor
 import { PlayerSettingsStore } from "../../../data/local/playerSettingsStore.js";
 import { metaRepository } from "../../../data/repository/metaRepository.js";
 import { I18n } from "../../../i18n/index.js";
+import { Platform } from "../../../platform/index.js";
 import { Environment } from "../../../platform/environment.js";
 import { Router } from "../../navigation/router.js";
 
@@ -473,10 +474,11 @@ function formatTime(secondsValue) {
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
+  const formatTwoDigits = (value) => (value < 10 ? `0${value}` : String(value));
   if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
   }
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  return `${minutes}:${formatTwoDigits(seconds)}`;
 }
 
 function formatClock(date = new Date()) {
@@ -2196,8 +2198,11 @@ export const PlayerScreen = {
             ${this.params.playerLogoUrl ? `<img class="player-loading-logo" src="${this.params.playerLogoUrl}" alt="logo" />` : ""}
             <div class="player-loading-title">${escapeHtml(this.params.playerTitle || this.params.itemId || "Nuvio")}</div>
             ${this.params.playerSubtitle ? `<div class="player-loading-subtitle">${escapeHtml(this.params.playerSubtitle)}</div>` : ""}
+            <div id="playerLoadingStatus" class="player-loading-status hidden"></div>
           </div>
         </div>
+
+        <div id="playerDebugState" class="player-debug-state hidden"></div>
 
         <div id="playerParentalGuide" class="player-parental-guide hidden"></div>
         <div id="playerSkipIntro" class="player-skip-intro hidden"></div>
@@ -2276,6 +2281,8 @@ export const PlayerScreen = {
     this.uiRefs = uiRoot ? {
       root: uiRoot,
       loadingOverlay: uiRoot.querySelector("#playerLoadingOverlay"),
+      loadingStatus: uiRoot.querySelector("#playerLoadingStatus"),
+      debugState: uiRoot.querySelector("#playerDebugState"),
       parentalGuide: uiRoot.querySelector("#playerParentalGuide"),
       skipIntro: uiRoot.querySelector("#playerSkipIntro"),
       aspectToast: uiRoot.querySelector("#playerAspectToast"),
@@ -2481,7 +2488,9 @@ export const PlayerScreen = {
   canShowPauseOverlay() {
     return !this.isExternalFrameMode()
       && this.paused
+      && this.hasPresentedPlaybackFrame
       && !this.loadingVisible
+      && !String(this.sourcesError || "").trim()
       && !this.seekOverlayVisible
       && this.seekPreviewSeconds == null
       && !this.isDialogOpen()
@@ -2537,7 +2546,10 @@ export const PlayerScreen = {
     if (!overlay) {
       return;
     }
-    const hidden = !this.pauseOverlayVisible || this.loadingVisible;
+    const hidden = !this.pauseOverlayVisible
+      || this.loadingVisible
+      || !this.hasPresentedPlaybackFrame
+      || Boolean(String(this.sourcesError || "").trim());
     overlay.classList.toggle("hidden", hidden);
     controlsOverlay?.classList.toggle("pause-overlay-active", !hidden);
     if (hidden) {
@@ -3352,6 +3364,27 @@ export const PlayerScreen = {
     return this.subtitleDialogVisible || this.audioDialogVisible || this.sourcesPanelVisible || this.episodePanelVisible || this.speedDialogVisible;
   },
 
+  shouldShowControlsOverlay() {
+    if (!this.controlsVisible) {
+      return false;
+    }
+    if (this.loadingVisible && !this.hasPresentedPlaybackFrame && !this.sourcesError && !this.isDialogOpen()) {
+      return false;
+    }
+    return true;
+  },
+
+  refreshControlsOverlayVisibility() {
+    if (this.isExternalFrameMode()) {
+      return;
+    }
+    const overlay = this.uiRefs?.controlsOverlay;
+    if (!overlay) {
+      return;
+    }
+    overlay.classList.toggle("hidden", !this.shouldShowControlsOverlay());
+  },
+
   setControlsVisible(visible, { focus = false } = {}) {
     this.controlsVisible = Boolean(visible);
     if (this.isExternalFrameMode()) {
@@ -3361,7 +3394,7 @@ export const PlayerScreen = {
     if (!overlay) {
       return;
     }
-    overlay.classList.toggle("hidden", !this.controlsVisible);
+    this.refreshControlsOverlayVisibility();
     this.renderSkipIntroButton();
     if (this.controlsVisible) {
       this.renderControlButtons();
@@ -3529,16 +3562,24 @@ export const PlayerScreen = {
 
   updateLoadingVisibility() {
     const overlay = this.uiRefs?.loadingOverlay;
+    const statusNode = this.uiRefs?.loadingStatus;
     if (!overlay) {
       return;
     }
+    const statusText = String(this.sourcesError || "").trim();
+    const showOverlay = Boolean(this.loadingVisible || statusText);
     const showLogoOnly = Boolean(
       this.loadingVisible
       && this.hasPresentedPlaybackFrame
       && this.params?.playerLogoUrl
     );
-    overlay.classList.toggle("hidden", !this.loadingVisible);
+    overlay.classList.toggle("hidden", !showOverlay);
     overlay.classList.toggle("logo-only", showLogoOnly);
+    if (statusNode) {
+      statusNode.textContent = statusText;
+      statusNode.classList.toggle("hidden", !statusText);
+    }
+    this.refreshControlsOverlayVisibility();
     if (this.loadingVisible) {
       this.dismissPauseOverlay();
       if (this.seekOverlayVisible || this.seekPreviewSeconds != null) {
@@ -3554,6 +3595,7 @@ export const PlayerScreen = {
       this.schedulePauseOverlay();
     }
     this.renderNextEpisodeCard();
+    this.updateDebugStateBadge();
   },
 
   renderNextEpisodeCard() {
@@ -3568,6 +3610,7 @@ export const PlayerScreen = {
     card.classList.toggle("hidden", hidden);
     if (hidden) {
       card.innerHTML = "";
+      this.updateDebugStateBadge();
       return;
     }
 
@@ -3593,6 +3636,82 @@ export const PlayerScreen = {
         </div>
       </div>
     `;
+    this.updateDebugStateBadge();
+  },
+
+  getPlayerDebugStateLabel() {
+    const statusText = String(this.sourcesError || "").trim();
+    const engine = String(PlayerController.playbackEngine || "none").trim() || "none";
+    const requestedEngine = typeof PlayerController.getRequestedPlaybackEngine === "function"
+      ? PlayerController.getRequestedPlaybackEngine()
+      : engine;
+    const platformName = typeof Platform?.getName === "function"
+      ? Platform.getName()
+      : "unknown";
+    const avplaySupported = typeof PlayerController.canUseAvPlay === "function"
+      ? PlayerController.canUseAvPlay()
+      : false;
+    const errorCode = typeof PlayerController.getLastPlaybackErrorCode === "function"
+      ? Number(PlayerController.getLastPlaybackErrorCode() || 0)
+      : 0;
+    const failureDetail = typeof PlayerController.getLastPlaybackFailureDetail === "function"
+      ? PlayerController.getLastPlaybackFailureDetail()
+      : "";
+    let state = "PLAYING";
+
+    if (this.sourcesPanelVisible) {
+      state = "SOURCES_PANEL";
+    } else if (this.subtitleDialogVisible) {
+      state = "SUBTITLE_DIALOG";
+    } else if (this.audioDialogVisible) {
+      state = "AUDIO_DIALOG";
+    } else if (this.speedDialogVisible) {
+      state = "SPEED_DIALOG";
+    } else if (statusText && this.loadingVisible) {
+      state = "ERROR_LOADING";
+    } else if (statusText) {
+      state = "ERROR";
+    } else if (this.loadingVisible && this.hasPresentedPlaybackFrame) {
+      state = "LOADING_AFTER_FRAME";
+    } else if (this.loadingVisible) {
+      state = "LOADING_BEFORE_FRAME";
+    } else if (this.pauseOverlayVisible) {
+      state = "PAUSE_OVERLAY";
+    } else if (this.seekOverlayVisible) {
+      state = "SEEK_OVERLAY";
+    } else if (this.isNextEpisodeCardVisible()) {
+      state = "NEXT_EPISODE";
+    } else if (this.controlsVisible) {
+      state = "CONTROLS";
+    }
+
+    return [
+      `state=${state}`,
+      `platform=${platformName}`,
+      `avplay=${avplaySupported ? "yes" : "no"}`,
+      `requested=${requestedEngine}`,
+      `engine=${engine}`,
+      `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
+      errorCode > 0 ? `code=${errorCode}` : "",
+      failureDetail ? `detail=${failureDetail}` : "",
+      statusText ? `msg=${statusText}` : ""
+    ].filter(Boolean).join(" | ");
+  },
+
+  updateDebugStateBadge() {
+    const node = this.uiRefs?.debugState;
+    if (!node) {
+      return;
+    }
+    const enabled = Boolean(globalThis.__NUVIO_BOOT_DEBUG__?.enabled);
+    node.classList.toggle("hidden", !enabled);
+    if (!enabled) {
+      globalThis.__NUVIO_BOOT_DEBUG__?.clearDetail?.();
+      return;
+    }
+    const label = this.getPlayerDebugStateLabel();
+    globalThis.__NUVIO_BOOT_DEBUG__?.setDetail?.(label);
+    node.textContent = label;
   },
 
   updateUiTick() {
@@ -3666,6 +3785,7 @@ export const PlayerScreen = {
 
     this.syncPauseOverlayState();
     this.renderNextEpisodeCard();
+    this.updateDebugStateBadge();
 
     if (this.seekOverlayVisible && this.seekPreviewSeconds == null) {
       this.renderSeekOverlay();
@@ -6952,6 +7072,7 @@ export const PlayerScreen = {
     panel.classList.toggle("hidden", !this.sourcesPanelVisible);
     if (!this.sourcesPanelVisible) {
       panel.innerHTML = "";
+      this.updateDebugStateBadge();
       return;
     }
 
@@ -7018,6 +7139,7 @@ export const PlayerScreen = {
     if (focusedCard) {
       focusedCard.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
+    this.updateDebugStateBadge();
   },
 
   moveSourcesFocus(direction) {
@@ -7930,6 +8052,7 @@ export const PlayerScreen = {
   },
 
   cleanup() {
+    globalThis.__NUVIO_BOOT_DEBUG__?.clearDetail?.();
     this.cancelSeekPreview({ commit: false });
     this.dismissPauseOverlay();
     this.pauseOverlayMetaRequestToken = Number(this.pauseOverlayMetaRequestToken || 0) + 1;

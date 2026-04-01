@@ -8,6 +8,7 @@ import { dashJsEngine } from "./engines/dashJsEngine.js";
 import { resolvePlatformAvplayEngine } from "./engines/platformAvplayEngine.js";
 import { WebOsLunaService } from "../../platform/webos/webosLunaService.js";
 import { loadStreamingLibs } from "../../runtime/loadStreamingLibs.js";
+import { PREFERRED_PLAYBACK_ORDER } from "../../config.js";
 
 export const PlayerController = {
 
@@ -40,6 +41,8 @@ export const PlayerController = {
   avplayDurationMs: 0,
   avplayTrackSyncAt: 0,
   lastPlaybackErrorCode: 0,
+  requestedPlaybackEngine: "none",
+  lastPlaybackFailureDetail: "",
   currentPlaybackUrl: "",
   currentPlaybackHeaders: {},
   currentPlaybackMediaSourceType: null,
@@ -856,6 +859,7 @@ export const PlayerController = {
     this.avplayCurrentTimeMs = 0;
     this.avplayDurationMs = 0;
     this.lastPlaybackErrorCode = 0;
+    this.lastPlaybackFailureDetail = "";
     this.playbackEngine = this.getPlatformAvplayEngineName();
 
     this.emitVideoEvent("waiting", { playbackEngine: this.playbackEngine });
@@ -864,6 +868,7 @@ export const PlayerController = {
       avplay.open(this.avplayUrl);
     } catch (error) {
       this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(error?.name || error?.message || error);
+      this.lastPlaybackFailureDetail = `avplay_open:${String(error?.name || error?.message || error || "unknown").trim()}`;
       this.teardownAvPlay();
       this.playbackEngine = "none";
       return false;
@@ -902,6 +907,7 @@ export const PlayerController = {
           this.avplayReady = false;
           this.isPlaying = false;
           this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+          this.lastPlaybackFailureDetail = `avplay_error:${String(errorValue || "unknown").trim()}`;
           this.stopAvPlayTickTimer();
           this.emitVideoEvent("error", {
             playbackEngine: this.playbackEngine,
@@ -945,6 +951,7 @@ export const PlayerController = {
       } catch (error) {
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(error?.name || error?.message || error);
         this.isPlaying = false;
+        this.lastPlaybackFailureDetail = `avplay_play:${String(error?.name || error?.message || error || "unknown").trim()}`;
         this.emitVideoEvent("error", {
           playbackEngine: this.playbackEngine,
           mediaErrorCode: this.lastPlaybackErrorCode
@@ -954,6 +961,7 @@ export const PlayerController = {
 
     const onPrepareError = (errorValue) => {
       this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+      this.lastPlaybackFailureDetail = `avplay_prepare:${String(errorValue || "unknown").trim()}`;
       this.isPlaying = false;
       this.teardownAvPlay();
       this.playbackEngine = "none";
@@ -1065,6 +1073,14 @@ export const PlayerController = {
     return Number(this.lastPlaybackErrorCode || 0);
   },
 
+  getRequestedPlaybackEngine() {
+    return String(this.requestedPlaybackEngine || "none").trim() || "none";
+  },
+
+  getLastPlaybackFailureDetail() {
+    return String(this.lastPlaybackFailureDetail || "").trim();
+  },
+
   forceAvPlayFallbackForCurrentSource(reason = "fallback") {
     const url = String(this.currentPlaybackUrl || this.video?.currentSrc || this.video?.src || "").trim();
     if (!url || this.avplayFallbackAttempts.has(url) || !this.canUseAvPlay()) {
@@ -1124,10 +1140,20 @@ export const PlayerController = {
       || normalized === "stream";
   },
 
+  shouldPreferAvPlayForTizenSource(url, sourceType = null) {
+    const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+    return Platform.isTizen()
+      && this.canUseAvPlay()
+      && !this.isLikelyHlsMimeType(normalizedSourceType)
+      && !this.isLikelyDashMimeType(normalizedSourceType)
+      && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+  },
+
   getPlaybackEngineCandidates(url, sourceType = null, itemType = this.currentItemType) {
     const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
     const avplayEngine = this.getPlatformAvplayEngineName();
     const isTizenRuntime = Platform.isTizen();
+    const preferAvPlayForTizenSource = this.shouldPreferAvPlayForTizenSource(url, normalizedSourceType);
     const isLivePlayback = this.isLivePlaybackItemType(itemType);
     const canUseAvPlay = this.canUseAvPlay();
     const canUseHlsJs = this.canUseHlsJs();
@@ -1198,6 +1224,9 @@ export const PlayerController = {
     }
 
     const candidates = [];
+    if (preferAvPlayForTizenSource) {
+      pushCandidate(candidates, avplayEngine);
+    }
     if (isTizenRuntime) {
       pushCandidate(candidates, "native-file");
     }
@@ -1209,6 +1238,45 @@ export const PlayerController = {
       pushCandidate(candidates, avplayEngine);
     }
     return candidates;
+  },
+
+  normalizeConfiguredPlaybackEngineName(name) {
+    const normalized = String(name || "").trim().toLowerCase();
+    if (!normalized) {
+      return "";
+    }
+    if (normalized === "platform-avplay" || normalized === "avplay") {
+      return this.getPlatformAvplayEngineName();
+    }
+    return normalized;
+  },
+
+  orderPlaybackCandidates(candidates = [], url = this.currentPlaybackUrl, sourceType = null) {
+    const available = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+    if (!available.length) {
+      return [];
+    }
+
+    const ordered = [];
+    const pushUnique = (candidate) => {
+      const normalized = String(candidate || "").trim();
+      if (!normalized || ordered.includes(normalized) || !available.includes(normalized)) {
+        return;
+      }
+      ordered.push(normalized);
+    };
+
+    const avplayEngine = this.getPlatformAvplayEngineName();
+    if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
+      pushUnique(avplayEngine);
+    }
+
+    PREFERRED_PLAYBACK_ORDER
+      .map((entry) => this.normalizeConfiguredPlaybackEngineName(entry))
+      .forEach(pushUnique);
+
+    available.forEach(pushUnique);
+    return ordered;
   },
 
   getAlternativePlaybackEngine(url = this.currentPlaybackUrl, sourceType = this.currentPlaybackMediaSourceType, itemType = this.currentItemType) {
@@ -2015,7 +2083,15 @@ export const PlayerController = {
   },
 
   choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
-    const candidates = this.getPlaybackEngineCandidates(url, sourceType, itemType);
+    if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
+      return this.getPlatformAvplayEngineName();
+    }
+
+    const candidates = this.orderPlaybackCandidates(
+      this.getPlaybackEngineCandidates(url, sourceType, itemType),
+      url,
+      sourceType
+    );
     if (candidates.length) {
       return candidates[0];
     }
@@ -2173,6 +2249,7 @@ export const PlayerController = {
     this.currentPlaybackHeaders = { ...(requestHeaders || {}) };
     this.currentPlaybackMediaSourceType = mediaSourceType || null;
     this.lastPlaybackErrorCode = 0;
+    this.lastPlaybackFailureDetail = "";
     const playToken = Number(this.playRequestToken || 0) + 1;
     this.playRequestToken = playToken;
 
@@ -2182,6 +2259,7 @@ export const PlayerController = {
       return;
     }
     const preferredEngine = forceEngine || this.choosePlaybackEngine(url, sourceType, itemType);
+    this.requestedPlaybackEngine = String(preferredEngine || "none").trim() || "none";
     this.rememberPlaybackEngineAttempt(this.currentPlaybackUrl, preferredEngine, {
       reset: !forceEngine
     });

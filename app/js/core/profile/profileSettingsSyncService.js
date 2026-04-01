@@ -237,7 +237,9 @@ function androidColorIntToHex(value, fallback = "#ffffff") {
     return fallback;
   }
   const unsigned = parsed >>> 0;
-  return `#${unsigned.toString(16).slice(-6).padStart(6, "0")}`;
+  const hex = unsigned.toString(16).slice(-6);
+  const paddedHex = hex.length >= 6 ? hex : `${"000000".slice(hex.length)}${hex}`;
+  return `#${paddedHex}`;
 }
 
 const FEATURE_ADAPTERS = {

@@ -602,10 +602,11 @@ function formatPlaybackTime(value = 0) {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+  const formatTwoDigits = (numericValue) => (numericValue < 10 ? `0${numericValue}` : String(numericValue));
   if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
   }
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  return `${minutes}:${formatTwoDigits(seconds)}`;
 }
 
 function normalizeTrailerProxyStatePayload(payload, fallbackMuted = false) {

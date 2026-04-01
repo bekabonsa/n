@@ -2213,7 +2213,9 @@
       return fallback;
     }
     const unsigned = parsed >>> 0;
-    return `#${unsigned.toString(16).slice(-6).padStart(6, "0")}`;
+    const hex = unsigned.toString(16).slice(-6);
+    const paddedHex = hex.length >= 6 ? hex : `${"000000".slice(hex.length)}${hex}`;
+    return `#${paddedHex}`;
   }
   function buildComparableFeaturesFromBlob(blob = {}) {
     return SUPPORTED_FEATURE_NAMES.reduce((accumulator, featureName) => {
@@ -3122,6 +3124,41 @@
     Object.defineProperty(String.prototype, "trimEnd", {
       value: function trimEndPolyfill() {
         return String(this).replace(/\s+$/, "");
+      },
+      configurable: true,
+      writable: true
+    });
+  }
+  function createStringPadding(source, targetLength, fillString, fromStart) {
+    var value = String(source);
+    var maxLength = Number(targetLength) || 0;
+    if (value.length >= maxLength) {
+      return value;
+    }
+    var filler = fillString === void 0 ? " " : String(fillString);
+    if (!filler) {
+      filler = " ";
+    }
+    var padding = "";
+    while (padding.length < maxLength - value.length) {
+      padding += filler;
+    }
+    padding = padding.slice(0, Math.max(0, maxLength - value.length));
+    return fromStart ? padding + value : value + padding;
+  }
+  if (!String.prototype.padStart) {
+    Object.defineProperty(String.prototype, "padStart", {
+      value: function padStartPolyfill(targetLength, fillString) {
+        return createStringPadding(this, targetLength, fillString, true);
+      },
+      configurable: true,
+      writable: true
+    });
+  }
+  if (!String.prototype.padEnd) {
+    Object.defineProperty(String.prototype, "padEnd", {
+      value: function padEndPolyfill(targetLength, fillString) {
+        return createStringPadding(this, targetLength, fillString, false);
       },
       configurable: true,
       writable: true
@@ -11009,6 +11046,7 @@
   }
 
   // js/core/player/playerController.js
+  init_config();
   var PlayerController = {
     video: null,
     isPlaying: false,
@@ -11039,6 +11077,8 @@
     avplayDurationMs: 0,
     avplayTrackSyncAt: 0,
     lastPlaybackErrorCode: 0,
+    requestedPlaybackEngine: "none",
+    lastPlaybackFailureDetail: "",
     currentPlaybackUrl: "",
     currentPlaybackHeaders: {},
     currentPlaybackMediaSourceType: null,
@@ -11737,12 +11777,14 @@
       this.avplayCurrentTimeMs = 0;
       this.avplayDurationMs = 0;
       this.lastPlaybackErrorCode = 0;
+      this.lastPlaybackFailureDetail = "";
       this.playbackEngine = this.getPlatformAvplayEngineName();
       this.emitVideoEvent("waiting", { playbackEngine: this.playbackEngine });
       try {
         avplay.open(this.avplayUrl);
       } catch (error) {
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error);
+        this.lastPlaybackFailureDetail = `avplay_open:${String((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error || "unknown").trim()}`;
         this.teardownAvPlay();
         this.playbackEngine = "none";
         return false;
@@ -11779,6 +11821,7 @@
             this.avplayReady = false;
             this.isPlaying = false;
             this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+            this.lastPlaybackFailureDetail = `avplay_error:${String(errorValue || "unknown").trim()}`;
             this.stopAvPlayTickTimer();
             this.emitVideoEvent("error", {
               playbackEngine: this.playbackEngine,
@@ -11821,6 +11864,7 @@
         } catch (error) {
           this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error);
           this.isPlaying = false;
+          this.lastPlaybackFailureDetail = `avplay_play:${String((error == null ? void 0 : error.name) || (error == null ? void 0 : error.message) || error || "unknown").trim()}`;
           this.emitVideoEvent("error", {
             playbackEngine: this.playbackEngine,
             mediaErrorCode: this.lastPlaybackErrorCode
@@ -11829,6 +11873,7 @@
       };
       const onPrepareError = (errorValue) => {
         this.lastPlaybackErrorCode = this.mapAvPlayErrorToMediaCode(errorValue);
+        this.lastPlaybackFailureDetail = `avplay_prepare:${String(errorValue || "unknown").trim()}`;
         this.isPlaying = false;
         this.teardownAvPlay();
         this.playbackEngine = "none";
@@ -11933,6 +11978,12 @@
     getLastPlaybackErrorCode() {
       return Number(this.lastPlaybackErrorCode || 0);
     },
+    getRequestedPlaybackEngine() {
+      return String(this.requestedPlaybackEngine || "none").trim() || "none";
+    },
+    getLastPlaybackFailureDetail() {
+      return String(this.lastPlaybackFailureDetail || "").trim();
+    },
     forceAvPlayFallbackForCurrentSource(reason = "fallback") {
       var _a, _b;
       const url = String(this.currentPlaybackUrl || ((_a = this.video) == null ? void 0 : _a.currentSrc) || ((_b = this.video) == null ? void 0 : _b.src) || "").trim();
@@ -11982,10 +12033,15 @@
       const normalized = String(itemType || "").trim().toLowerCase();
       return normalized === "channel" || normalized === "live" || normalized === "tvchannel" || normalized === "stream";
     },
+    shouldPreferAvPlayForTizenSource(url, sourceType = null) {
+      const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+      return Platform.isTizen() && this.canUseAvPlay() && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+    },
     getPlaybackEngineCandidates(url, sourceType = null, itemType = this.currentItemType) {
       const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
       const avplayEngine = this.getPlatformAvplayEngineName();
       const isTizenRuntime = Platform.isTizen();
+      const preferAvPlayForTizenSource = this.shouldPreferAvPlayForTizenSource(url, normalizedSourceType);
       const isLivePlayback = this.isLivePlaybackItemType(itemType);
       const canUseAvPlay = this.canUseAvPlay();
       const canUseHlsJs = this.canUseHlsJs();
@@ -12052,6 +12108,9 @@
         return candidates2;
       }
       const candidates = [];
+      if (preferAvPlayForTizenSource) {
+        pushCandidate(candidates, avplayEngine);
+      }
       if (isTizenRuntime) {
         pushCandidate(candidates, "native-file");
       }
@@ -12063,6 +12122,37 @@
         pushCandidate(candidates, avplayEngine);
       }
       return candidates;
+    },
+    normalizeConfiguredPlaybackEngineName(name) {
+      const normalized = String(name || "").trim().toLowerCase();
+      if (!normalized) {
+        return "";
+      }
+      if (normalized === "platform-avplay" || normalized === "avplay") {
+        return this.getPlatformAvplayEngineName();
+      }
+      return normalized;
+    },
+    orderPlaybackCandidates(candidates = [], url = this.currentPlaybackUrl, sourceType = null) {
+      const available = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+      if (!available.length) {
+        return [];
+      }
+      const ordered = [];
+      const pushUnique = (candidate) => {
+        const normalized = String(candidate || "").trim();
+        if (!normalized || ordered.includes(normalized) || !available.includes(normalized)) {
+          return;
+        }
+        ordered.push(normalized);
+      };
+      const avplayEngine = this.getPlatformAvplayEngineName();
+      if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
+        pushUnique(avplayEngine);
+      }
+      PREFERRED_PLAYBACK_ORDER.map((entry) => this.normalizeConfiguredPlaybackEngineName(entry)).forEach(pushUnique);
+      available.forEach(pushUnique);
+      return ordered;
     },
     getAlternativePlaybackEngine(url = this.currentPlaybackUrl, sourceType = this.currentPlaybackMediaSourceType, itemType = this.currentItemType) {
       const normalizedUrl = String(url || "").trim();
@@ -12793,7 +12883,14 @@
       });
     },
     choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
-      const candidates = this.getPlaybackEngineCandidates(url, sourceType, itemType);
+      if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
+        return this.getPlatformAvplayEngineName();
+      }
+      const candidates = this.orderPlaybackCandidates(
+        this.getPlaybackEngineCandidates(url, sourceType, itemType),
+        url,
+        sourceType
+      );
       if (candidates.length) {
         return candidates[0];
       }
@@ -12932,6 +13029,7 @@
         this.currentPlaybackHeaders = __spreadValues({}, requestHeaders || {});
         this.currentPlaybackMediaSourceType = mediaSourceType || null;
         this.lastPlaybackErrorCode = 0;
+        this.lastPlaybackFailureDetail = "";
         const playToken = Number(this.playRequestToken || 0) + 1;
         this.playRequestToken = playToken;
         const sourceType = String(mediaSourceType || this.guessMediaMimeType(url) || "").trim() || null;
@@ -12940,6 +13038,7 @@
           return;
         }
         const preferredEngine = forceEngine || this.choosePlaybackEngine(url, sourceType, itemType);
+        this.requestedPlaybackEngine = String(preferredEngine || "none").trim() || "none";
         this.rememberPlaybackEngineAttempt(this.currentPlaybackUrl, preferredEngine, {
           reset: !forceEngine
         });
@@ -14287,10 +14386,11 @@
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor(total % 3600 / 60);
     const seconds = total % 60;
+    const formatTwoDigits = (value) => value < 10 ? `0${value}` : String(value);
     if (hours > 0) {
-      return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
     }
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    return `${minutes}:${formatTwoDigits(seconds)}`;
   }
   function formatClock(date = /* @__PURE__ */ new Date()) {
     const locale = typeof I18n.getLocale === "function" ? I18n.getLocale() : void 0;
@@ -15786,8 +15886,11 @@
             ${this.params.playerLogoUrl ? `<img class="player-loading-logo" src="${this.params.playerLogoUrl}" alt="logo" />` : ""}
             <div class="player-loading-title">${escapeHtml3(this.params.playerTitle || this.params.itemId || "Nuvio")}</div>
             ${this.params.playerSubtitle ? `<div class="player-loading-subtitle">${escapeHtml3(this.params.playerSubtitle)}</div>` : ""}
+            <div id="playerLoadingStatus" class="player-loading-status hidden"></div>
           </div>
         </div>
+
+        <div id="playerDebugState" class="player-debug-state hidden"></div>
 
         <div id="playerParentalGuide" class="player-parental-guide hidden"></div>
         <div id="playerSkipIntro" class="player-skip-intro hidden"></div>
@@ -15865,6 +15968,8 @@
       this.uiRefs = uiRoot ? {
         root: uiRoot,
         loadingOverlay: uiRoot.querySelector("#playerLoadingOverlay"),
+        loadingStatus: uiRoot.querySelector("#playerLoadingStatus"),
+        debugState: uiRoot.querySelector("#playerDebugState"),
         parentalGuide: uiRoot.querySelector("#playerParentalGuide"),
         skipIntro: uiRoot.querySelector("#playerSkipIntro"),
         aspectToast: uiRoot.querySelector("#playerAspectToast"),
@@ -16031,7 +16136,7 @@
       }
     },
     canShowPauseOverlay() {
-      return !this.isExternalFrameMode() && this.paused && !this.loadingVisible && !this.seekOverlayVisible && this.seekPreviewSeconds == null && !this.isDialogOpen() && !this.parentalGuideVisible && !this.moreActionsVisible && !this.isNextEpisodeCardVisible();
+      return !this.isExternalFrameMode() && this.paused && this.hasPresentedPlaybackFrame && !this.loadingVisible && !String(this.sourcesError || "").trim() && !this.seekOverlayVisible && this.seekPreviewSeconds == null && !this.isDialogOpen() && !this.parentalGuideVisible && !this.moreActionsVisible && !this.isNextEpisodeCardVisible();
     },
     dismissPauseOverlay({ revealControls = false, focus = false } = {}) {
       this.clearPauseOverlayTimer();
@@ -16078,7 +16183,7 @@
       if (!overlay) {
         return;
       }
-      const hidden = !this.pauseOverlayVisible || this.loadingVisible;
+      const hidden = !this.pauseOverlayVisible || this.loadingVisible || !this.hasPresentedPlaybackFrame || Boolean(String(this.sourcesError || "").trim());
       overlay.classList.toggle("hidden", hidden);
       controlsOverlay == null ? void 0 : controlsOverlay.classList.toggle("pause-overlay-active", !hidden);
       if (hidden) {
@@ -16805,6 +16910,26 @@
     isDialogOpen() {
       return this.subtitleDialogVisible || this.audioDialogVisible || this.sourcesPanelVisible || this.episodePanelVisible || this.speedDialogVisible;
     },
+    shouldShowControlsOverlay() {
+      if (!this.controlsVisible) {
+        return false;
+      }
+      if (this.loadingVisible && !this.hasPresentedPlaybackFrame && !this.sourcesError && !this.isDialogOpen()) {
+        return false;
+      }
+      return true;
+    },
+    refreshControlsOverlayVisibility() {
+      var _a;
+      if (this.isExternalFrameMode()) {
+        return;
+      }
+      const overlay = (_a = this.uiRefs) == null ? void 0 : _a.controlsOverlay;
+      if (!overlay) {
+        return;
+      }
+      overlay.classList.toggle("hidden", !this.shouldShowControlsOverlay());
+    },
     setControlsVisible(visible, { focus = false } = {}) {
       var _a;
       this.controlsVisible = Boolean(visible);
@@ -16815,7 +16940,7 @@
       if (!overlay) {
         return;
       }
-      overlay.classList.toggle("hidden", !this.controlsVisible);
+      this.refreshControlsOverlayVisibility();
       this.renderSkipIntroButton();
       if (this.controlsVisible) {
         this.renderControlButtons();
@@ -16967,16 +17092,24 @@
       }
     },
     updateLoadingVisibility() {
-      var _a, _b;
+      var _a, _b, _c;
       const overlay = (_a = this.uiRefs) == null ? void 0 : _a.loadingOverlay;
+      const statusNode = (_b = this.uiRefs) == null ? void 0 : _b.loadingStatus;
       if (!overlay) {
         return;
       }
+      const statusText = String(this.sourcesError || "").trim();
+      const showOverlay = Boolean(this.loadingVisible || statusText);
       const showLogoOnly = Boolean(
-        this.loadingVisible && this.hasPresentedPlaybackFrame && ((_b = this.params) == null ? void 0 : _b.playerLogoUrl)
+        this.loadingVisible && this.hasPresentedPlaybackFrame && ((_c = this.params) == null ? void 0 : _c.playerLogoUrl)
       );
-      overlay.classList.toggle("hidden", !this.loadingVisible);
+      overlay.classList.toggle("hidden", !showOverlay);
       overlay.classList.toggle("logo-only", showLogoOnly);
+      if (statusNode) {
+        statusNode.textContent = statusText;
+        statusNode.classList.toggle("hidden", !statusText);
+      }
+      this.refreshControlsOverlayVisibility();
       if (this.loadingVisible) {
         this.dismissPauseOverlay();
         if (this.seekOverlayVisible || this.seekPreviewSeconds != null) {
@@ -16992,6 +17125,7 @@
         this.schedulePauseOverlay();
       }
       this.renderNextEpisodeCard();
+      this.updateDebugStateBadge();
     },
     renderNextEpisodeCard() {
       var _a, _b;
@@ -17004,6 +17138,7 @@
       card.classList.toggle("hidden", hidden);
       if (hidden) {
         card.innerHTML = "";
+        this.updateDebugStateBadge();
         return;
       }
       const titleLine = [nextEpisode.episodeLabel, nextEpisode.episodeTitle].filter(Boolean).join(" \u2022 ");
@@ -17025,6 +17160,70 @@
         </div>
       </div>
     `;
+      this.updateDebugStateBadge();
+    },
+    getPlayerDebugStateLabel() {
+      var _a;
+      const statusText = String(this.sourcesError || "").trim();
+      const engine = String(PlayerController.playbackEngine || "none").trim() || "none";
+      const requestedEngine = typeof PlayerController.getRequestedPlaybackEngine === "function" ? PlayerController.getRequestedPlaybackEngine() : engine;
+      const platformName = typeof ((_a = Platform) == null ? void 0 : _a.getName) === "function" ? Platform.getName() : "unknown";
+      const avplaySupported = typeof PlayerController.canUseAvPlay === "function" ? PlayerController.canUseAvPlay() : false;
+      const errorCode = typeof PlayerController.getLastPlaybackErrorCode === "function" ? Number(PlayerController.getLastPlaybackErrorCode() || 0) : 0;
+      const failureDetail = typeof PlayerController.getLastPlaybackFailureDetail === "function" ? PlayerController.getLastPlaybackFailureDetail() : "";
+      let state = "PLAYING";
+      if (this.sourcesPanelVisible) {
+        state = "SOURCES_PANEL";
+      } else if (this.subtitleDialogVisible) {
+        state = "SUBTITLE_DIALOG";
+      } else if (this.audioDialogVisible) {
+        state = "AUDIO_DIALOG";
+      } else if (this.speedDialogVisible) {
+        state = "SPEED_DIALOG";
+      } else if (statusText && this.loadingVisible) {
+        state = "ERROR_LOADING";
+      } else if (statusText) {
+        state = "ERROR";
+      } else if (this.loadingVisible && this.hasPresentedPlaybackFrame) {
+        state = "LOADING_AFTER_FRAME";
+      } else if (this.loadingVisible) {
+        state = "LOADING_BEFORE_FRAME";
+      } else if (this.pauseOverlayVisible) {
+        state = "PAUSE_OVERLAY";
+      } else if (this.seekOverlayVisible) {
+        state = "SEEK_OVERLAY";
+      } else if (this.isNextEpisodeCardVisible()) {
+        state = "NEXT_EPISODE";
+      } else if (this.controlsVisible) {
+        state = "CONTROLS";
+      }
+      return [
+        `state=${state}`,
+        `platform=${platformName}`,
+        `avplay=${avplaySupported ? "yes" : "no"}`,
+        `requested=${requestedEngine}`,
+        `engine=${engine}`,
+        `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
+        errorCode > 0 ? `code=${errorCode}` : "",
+        failureDetail ? `detail=${failureDetail}` : "",
+        statusText ? `msg=${statusText}` : ""
+      ].filter(Boolean).join(" | ");
+    },
+    updateDebugStateBadge() {
+      var _a, _b, _c, _d, _e, _f;
+      const node = (_a = this.uiRefs) == null ? void 0 : _a.debugState;
+      if (!node) {
+        return;
+      }
+      const enabled = Boolean((_b = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _b.enabled);
+      node.classList.toggle("hidden", !enabled);
+      if (!enabled) {
+        (_d = (_c = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _c.clearDetail) == null ? void 0 : _d.call(_c);
+        return;
+      }
+      const label = this.getPlayerDebugStateLabel();
+      (_f = (_e = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _e.setDetail) == null ? void 0 : _f.call(_e, label);
+      node.textContent = label;
     },
     updateUiTick() {
       var _a, _b, _c, _d;
@@ -17091,6 +17290,7 @@
       }
       this.syncPauseOverlayState();
       this.renderNextEpisodeCard();
+      this.updateDebugStateBadge();
       if (this.seekOverlayVisible && this.seekPreviewSeconds == null) {
         this.renderSeekOverlay();
       }
@@ -19924,6 +20124,7 @@ ${normalized}`;
       panel.classList.toggle("hidden", !this.sourcesPanelVisible);
       if (!this.sourcesPanelVisible) {
         panel.innerHTML = "";
+        this.updateDebugStateBadge();
         return;
       }
       const filters = this.getSourceFilters();
@@ -19984,6 +20185,7 @@ ${normalized}`;
       if (focusedCard) {
         focusedCard.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
+      this.updateDebugStateBadge();
     },
     moveSourcesFocus(direction) {
       const filters = this.getSourceFilters();
@@ -20816,11 +21018,12 @@ ${normalized}`;
       });
     },
     cleanup() {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e, _f;
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.clearDetail) == null ? void 0 : _b.call(_a);
       this.cancelSeekPreview({ commit: false });
       this.dismissPauseOverlay();
       this.pauseOverlayMetaRequestToken = Number(this.pauseOverlayMetaRequestToken || 0) + 1;
-      (_b = (_a = this.streamCandidatesByVideoId) == null ? void 0 : _a.clear) == null ? void 0 : _b.call(_a);
+      (_d = (_c = this.streamCandidatesByVideoId) == null ? void 0 : _c.clear) == null ? void 0 : _d.call(_c);
       this.skipIntervalsRequestToken = Number(this.skipIntervalsRequestToken || 0) + 1;
       this.subtitleLoadToken = (this.subtitleLoadToken || 0) + 1;
       this.manifestLoadToken = (this.manifestLoadToken || 0) + 1;
@@ -20857,8 +21060,8 @@ ${normalized}`;
       PlayerController.stop();
       if (this.container) {
         this.container.style.display = "none";
-        (_c = this.container.querySelector("#playerUiRoot")) == null ? void 0 : _c.remove();
-        (_d = this.container.querySelector("#episodeSidePanel")) == null ? void 0 : _d.remove();
+        (_e = this.container.querySelector("#playerUiRoot")) == null ? void 0 : _e.remove();
+        (_f = this.container.querySelector("#episodeSidePanel")) == null ? void 0 : _f.remove();
       }
       this.uiRefs = null;
       this.lastUiTickState = null;
@@ -25334,10 +25537,11 @@ ${normalized}`;
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor(totalSeconds % 3600 / 60);
     const seconds = totalSeconds % 60;
+    const formatTwoDigits = (numericValue) => numericValue < 10 ? `0${numericValue}` : String(numericValue);
     if (hours > 0) {
-      return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      return `${hours}:${formatTwoDigits(minutes)}:${formatTwoDigits(seconds)}`;
     }
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    return `${minutes}:${formatTwoDigits(seconds)}`;
   }
   function normalizeTrailerProxyStatePayload(payload, fallbackMuted = false) {
     const source = payload && typeof payload === "object" ? payload : {};
@@ -39055,6 +39259,34 @@ ${normalized}`;
   // js/app.js
   init_localStore();
   var GUEST_QR_BYPASS_KEY3 = "skipAuthQrGate";
+  function setBootDebugStatus(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.setStatus) == null ? void 0 : _b.call(_a, message);
+    } catch (_) {
+    }
+  }
+  function failBootDebugStatus(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.fail) == null ? void 0 : _b.call(_a, message);
+    } catch (_) {
+    }
+  }
+  function finishBootDebugStatus(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.done) == null ? void 0 : _b.call(_a, message);
+    } catch (_) {
+    }
+  }
+  function clearBootDebugDetail() {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.clearDetail) == null ? void 0 : _b.call(_a);
+    } catch (_) {
+    }
+  }
   function formatErrorMessage(error) {
     if (!error) {
       return "Unknown error";
@@ -39066,6 +39298,7 @@ ${normalized}`;
   }
   function renderFatalError(error) {
     const message = formatErrorMessage(error);
+    failBootDebugStatus(`Fatal startup error: ${message}`);
     document.body.innerHTML = `
     <div style="min-height:100vh;background:#0f1115;color:#f4f7fb;padding:48px;font-family:Arial,sans-serif;">
       <div style="max-width:960px;margin:0 auto;">
@@ -39098,22 +39331,35 @@ ${normalized}`;
   }
   function bootstrapApp() {
     return __async(this, null, function* () {
+      clearBootDebugDetail();
+      setBootDebugStatus("Rendering app shell...");
       renderAppShell();
+      setBootDebugStatus("Initializing platform...");
       Platform.init();
+      setBootDebugStatus(`Platform ready: ${Platform.getName()}. Applying performance mode...`);
       applyPerformanceMode();
+      setBootDebugStatus("Loading translations...");
       yield I18n.init();
+      setBootDebugStatus("Initializing router...");
       Router.init();
+      setBootDebugStatus("Initializing player controller...");
       PlayerController.init();
+      setBootDebugStatus("Initializing focus engine...");
       FocusEngine.init();
+      setBootDebugStatus("Applying theme...");
       ThemeManager.apply();
+      setBootDebugStatus("Applying translations...");
       I18n.apply();
+      setBootDebugStatus("Warming playback libraries...");
       warmStreamingLibs({ delayMs: 1400 });
       AuthManager.subscribe((state) => {
         if (state === AuthState.LOADING) {
+          setBootDebugStatus("Auth bootstrap running...");
           StartupSyncService.stop();
           return;
         }
         if (state === AuthState.SIGNED_OUT) {
+          setBootDebugStatus("Auth state: signed out.");
           StartupSyncService.stop();
           const shouldBypassQr = Boolean(LocalStore.get(GUEST_QR_BYPASS_KEY3, false));
           const landingRoute = shouldBypassQr ? "home" : getSignedOutLandingRoute();
@@ -39124,25 +39370,32 @@ ${normalized}`;
                 skipStackPush: true
               });
             }
+            finishBootDebugStatus("Startup finished on home.");
             return;
           }
           const hasSeenQr = LocalStore.get("hasSeenAuthQrOnFirstLaunch");
           Router.navigate(getPrimarySignInRoute(), {
             onboardingMode: !hasSeenQr
           });
+          finishBootDebugStatus(`Startup finished on ${getPrimarySignInRoute()}.`);
         }
         if (state === AuthState.AUTHENTICATED) {
+          setBootDebugStatus("Auth state: authenticated.");
           LocalStore.remove(GUEST_QR_BYPASS_KEY3);
           StartupSyncService.start();
           Router.navigate("profileSelection");
+          finishBootDebugStatus("Startup finished on profile selection.");
         }
       });
+      setBootDebugStatus("Bootstrapping auth...");
       yield AuthManager.bootstrap();
     });
   }
   function bootstrapAddonRemoteMode() {
     return __async(this, null, function* () {
+      setBootDebugStatus("Rendering addon remote mode...");
       yield renderAddonRemotePage();
+      finishBootDebugStatus("Addon remote mode ready.");
     });
   }
   if (document.readyState === "loading") {

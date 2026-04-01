@@ -153,6 +153,47 @@ if (!String.prototype.trimEnd) {
   });
 }
 
+function createStringPadding(source, targetLength, fillString, fromStart) {
+  var value = String(source);
+  var maxLength = Number(targetLength) || 0;
+  if (value.length >= maxLength) {
+    return value;
+  }
+
+  var filler = fillString === undefined ? " " : String(fillString);
+  if (!filler) {
+    filler = " ";
+  }
+
+  var padding = "";
+  while (padding.length < maxLength - value.length) {
+    padding += filler;
+  }
+  padding = padding.slice(0, Math.max(0, maxLength - value.length));
+
+  return fromStart ? padding + value : value + padding;
+}
+
+if (!String.prototype.padStart) {
+  Object.defineProperty(String.prototype, "padStart", {
+    value: function padStartPolyfill(targetLength, fillString) {
+      return createStringPadding(this, targetLength, fillString, true);
+    },
+    configurable: true,
+    writable: true
+  });
+}
+
+if (!String.prototype.padEnd) {
+  Object.defineProperty(String.prototype, "padEnd", {
+    value: function padEndPolyfill(targetLength, fillString) {
+      return createStringPadding(this, targetLength, fillString, false);
+    },
+    configurable: true,
+    writable: true
+  });
+}
+
 function installElementScrollToPolyfill(target) {
   if (!target || typeof target.scrollTo === "function") {
     return;
