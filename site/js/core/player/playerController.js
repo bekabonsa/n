@@ -1140,10 +1140,20 @@ export const PlayerController = {
       || normalized === "stream";
   },
 
+  shouldPreferAvPlayForTizenSource(url, sourceType = null) {
+    const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+    return Platform.isTizen()
+      && this.canUseAvPlay()
+      && !this.isLikelyHlsMimeType(normalizedSourceType)
+      && !this.isLikelyDashMimeType(normalizedSourceType)
+      && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+  },
+
   getPlaybackEngineCandidates(url, sourceType = null, itemType = this.currentItemType) {
     const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
     const avplayEngine = this.getPlatformAvplayEngineName();
     const isTizenRuntime = Platform.isTizen();
+    const preferAvPlayForTizenSource = this.shouldPreferAvPlayForTizenSource(url, normalizedSourceType);
     const isLivePlayback = this.isLivePlaybackItemType(itemType);
     const canUseAvPlay = this.canUseAvPlay();
     const canUseHlsJs = this.canUseHlsJs();
@@ -1214,6 +1224,9 @@ export const PlayerController = {
     }
 
     const candidates = [];
+    if (preferAvPlayForTizenSource) {
+      pushCandidate(candidates, avplayEngine);
+    }
     if (isTizenRuntime) {
       pushCandidate(candidates, "native-file");
     }
@@ -1254,15 +1267,7 @@ export const PlayerController = {
     };
 
     const avplayEngine = this.getPlatformAvplayEngineName();
-    const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
-    const isDirectTizenFile = Platform.isTizen()
-      && this.canUseAvPlay()
-      && this.isLikelyDirectFileUrl(url)
-      && !this.isLikelyHlsMimeType(normalizedSourceType)
-      && !this.isLikelyDashMimeType(normalizedSourceType)
-      && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
-
-    if (isDirectTizenFile) {
+    if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
       pushUnique(avplayEngine);
     }
 
@@ -2078,15 +2083,7 @@ export const PlayerController = {
   },
 
   choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
-    const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
-    const isDirectTizenFile = Platform.isTizen()
-      && this.canUseAvPlay()
-      && this.isLikelyDirectFileUrl(url)
-      && !this.isLikelyHlsMimeType(normalizedSourceType)
-      && !this.isLikelyDashMimeType(normalizedSourceType)
-      && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
-
-    if (isDirectTizenFile) {
+    if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
       return this.getPlatformAvplayEngineName();
     }
 

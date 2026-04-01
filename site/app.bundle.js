@@ -12033,10 +12033,15 @@
       const normalized = String(itemType || "").trim().toLowerCase();
       return normalized === "channel" || normalized === "live" || normalized === "tvchannel" || normalized === "stream";
     },
+    shouldPreferAvPlayForTizenSource(url, sourceType = null) {
+      const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+      return Platform.isTizen() && this.canUseAvPlay() && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+    },
     getPlaybackEngineCandidates(url, sourceType = null, itemType = this.currentItemType) {
       const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
       const avplayEngine = this.getPlatformAvplayEngineName();
       const isTizenRuntime = Platform.isTizen();
+      const preferAvPlayForTizenSource = this.shouldPreferAvPlayForTizenSource(url, normalizedSourceType);
       const isLivePlayback = this.isLivePlaybackItemType(itemType);
       const canUseAvPlay = this.canUseAvPlay();
       const canUseHlsJs = this.canUseHlsJs();
@@ -12103,6 +12108,9 @@
         return candidates2;
       }
       const candidates = [];
+      if (preferAvPlayForTizenSource) {
+        pushCandidate(candidates, avplayEngine);
+      }
       if (isTizenRuntime) {
         pushCandidate(candidates, "native-file");
       }
@@ -12139,9 +12147,7 @@
         ordered.push(normalized);
       };
       const avplayEngine = this.getPlatformAvplayEngineName();
-      const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
-      const isDirectTizenFile = Platform.isTizen() && this.canUseAvPlay() && this.isLikelyDirectFileUrl(url) && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
-      if (isDirectTizenFile) {
+      if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
         pushUnique(avplayEngine);
       }
       PREFERRED_PLAYBACK_ORDER.map((entry) => this.normalizeConfiguredPlaybackEngineName(entry)).forEach(pushUnique);
@@ -12877,9 +12883,7 @@
       });
     },
     choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
-      const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
-      const isDirectTizenFile = Platform.isTizen() && this.canUseAvPlay() && this.isLikelyDirectFileUrl(url) && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
-      if (isDirectTizenFile) {
+      if (this.shouldPreferAvPlayForTizenSource(url, sourceType)) {
         return this.getPlatformAvplayEngineName();
       }
       const candidates = this.orderPlaybackCandidates(
