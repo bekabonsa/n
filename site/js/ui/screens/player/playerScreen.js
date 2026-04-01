@@ -2484,7 +2484,9 @@ export const PlayerScreen = {
   canShowPauseOverlay() {
     return !this.isExternalFrameMode()
       && this.paused
+      && this.hasPresentedPlaybackFrame
       && !this.loadingVisible
+      && !String(this.sourcesError || "").trim()
       && !this.seekOverlayVisible
       && this.seekPreviewSeconds == null
       && !this.isDialogOpen()
@@ -2540,7 +2542,10 @@ export const PlayerScreen = {
     if (!overlay) {
       return;
     }
-    const hidden = !this.pauseOverlayVisible || this.loadingVisible;
+    const hidden = !this.pauseOverlayVisible
+      || this.loadingVisible
+      || !this.hasPresentedPlaybackFrame
+      || Boolean(String(this.sourcesError || "").trim());
     overlay.classList.toggle("hidden", hidden);
     controlsOverlay?.classList.toggle("pause-overlay-active", !hidden);
     if (hidden) {

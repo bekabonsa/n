@@ -16109,7 +16109,7 @@
       }
     },
     canShowPauseOverlay() {
-      return !this.isExternalFrameMode() && this.paused && !this.loadingVisible && !this.seekOverlayVisible && this.seekPreviewSeconds == null && !this.isDialogOpen() && !this.parentalGuideVisible && !this.moreActionsVisible && !this.isNextEpisodeCardVisible();
+      return !this.isExternalFrameMode() && this.paused && this.hasPresentedPlaybackFrame && !this.loadingVisible && !String(this.sourcesError || "").trim() && !this.seekOverlayVisible && this.seekPreviewSeconds == null && !this.isDialogOpen() && !this.parentalGuideVisible && !this.moreActionsVisible && !this.isNextEpisodeCardVisible();
     },
     dismissPauseOverlay({ revealControls = false, focus = false } = {}) {
       this.clearPauseOverlayTimer();
@@ -16156,7 +16156,7 @@
       if (!overlay) {
         return;
       }
-      const hidden = !this.pauseOverlayVisible || this.loadingVisible;
+      const hidden = !this.pauseOverlayVisible || this.loadingVisible || !this.hasPresentedPlaybackFrame || Boolean(String(this.sourcesError || "").trim());
       overlay.classList.toggle("hidden", hidden);
       controlsOverlay == null ? void 0 : controlsOverlay.classList.toggle("pause-overlay-active", !hidden);
       if (hidden) {
