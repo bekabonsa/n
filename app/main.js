@@ -1,12 +1,19 @@
 (function openHostedNuvioTvBuild() {
+  var launcherBuild = "2026-04-01a";
   var hostedAppUrl = "https://web.nuvioapp.space/";
   var tvInput = window.tizen && window.tizen.tvinputdevice;
+  var buildNode = document.getElementById("launcher-build");
+
+  if (buildNode) {
+    buildNode.textContent = "launcher " + launcherBuild;
+  }
 
   function buildFreshHostedUrl() {
     try {
       var url = new URL(hostedAppUrl);
       url.searchParams.set("source", "tizenbrew");
       url.searchParams.set("wrapper", "tizen");
+      url.searchParams.set("launcher_build", launcherBuild);
       url.searchParams.set("_cb", String(Date.now()));
       return url.toString();
     } catch (_) {
@@ -22,5 +29,7 @@
     });
   }
 
-  window.location.replace(buildFreshHostedUrl());
+  setTimeout(function redirectToHostedBuild() {
+    window.location.replace(buildFreshHostedUrl());
+  }, 700);
 }());

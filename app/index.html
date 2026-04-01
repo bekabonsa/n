@@ -15,10 +15,26 @@
       color: #fff;
       font: 600 24px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    .launcher-status {
+      display: grid;
+      gap: 10px;
+      justify-items: center;
+      text-align: center;
+      padding: 24px;
+    }
+    .launcher-build {
+      opacity: 0.72;
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
   </style>
 </head>
 <body>
-  <div>Opening Nuvio TV...</div>
+  <div class="launcher-status">
+    <div>Opening Nuvio TV...</div>
+    <div id="launcher-build" class="launcher-build"></div>
+  </div>
   <script src="main.js"></script>
 </body>
 </html>
