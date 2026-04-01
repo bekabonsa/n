@@ -2173,6 +2173,9 @@ export const PlayerScreen = {
     const root = document.createElement("div");
     root.id = "playerUiRoot";
     root.className = "player-ui-root";
+    if (Platform.isTizen() && typeof PlayerController.canUseAvPlay === "function" && PlayerController.canUseAvPlay()) {
+      root.classList.add("player-ui-root-tizen-avplay");
+    }
 
     if (this.isExternalFrameMode()) {
       root.innerHTML = `
@@ -3109,6 +3112,14 @@ export const PlayerScreen = {
         this.focusProgressBar();
       }
       this.resetControlsAutoHide();
+      if (Platform.isTizen() && typeof PlayerController.canUseAvPlay === "function" && PlayerController.canUseAvPlay()) {
+        clearTimeout(this.tizenOverlayCompactTimer);
+        this.tizenOverlayCompactTimer = setTimeout(() => {
+          if (!this.paused && !this.isDialogOpen() && !this.seekOverlayVisible) {
+            this.setControlsVisible(false);
+          }
+        }, 1400);
+      }
       this.maybeShowParentalGuideOverlay();
       setTimeout(() => {
         this.attemptSilentAudioRecovery("playing");
@@ -3470,6 +3481,10 @@ export const PlayerScreen = {
       clearTimeout(this.controlsHideTimer);
       this.controlsHideTimer = null;
     }
+    if (this.tizenOverlayCompactTimer) {
+      clearTimeout(this.tizenOverlayCompactTimer);
+      this.tizenOverlayCompactTimer = null;
+    }
   },
 
   resetControlsAutoHide() {
@@ -3479,7 +3494,7 @@ export const PlayerScreen = {
     }
     this.controlsHideTimer = setTimeout(() => {
       this.setControlsVisible(false);
-    }, 4200);
+    }, Platform.isTizen() && typeof PlayerController.canUseAvPlay === "function" && PlayerController.canUseAvPlay() ? 2200 : 4200);
   },
 
   getPlaybackCurrentSeconds() {

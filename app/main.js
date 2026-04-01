@@ -3,7 +3,7 @@ window.__NUVIO_PLATFORM__ = "tizen";
 var bootStatusNode = document.getElementById("nuvio-tizen-boot-status");
 var buildLabelNode = document.getElementById("nuvio-tizen-build-label");
 var bootOverlayDismissed = false;
-var buildLabel = "2026-04-01T21:41:13.082Z";
+var buildLabel = "2026-04-01T22:04:06.503Z";
 
 if (buildLabelNode) {
   buildLabelNode.textContent = buildLabel || "packaged-build";

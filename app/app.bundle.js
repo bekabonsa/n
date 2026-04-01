@@ -4467,6 +4467,55 @@
     }
     return avplay;
   }
+  function ensureAvplayHost(videoElement) {
+    if (!(videoElement instanceof HTMLElement)) {
+      return;
+    }
+    const parent = videoElement.parentElement;
+    if (!(parent instanceof HTMLElement)) {
+      return;
+    }
+    parent.style.position = "relative";
+    parent.style.background = "black";
+    parent.style.overflow = "hidden";
+    let host = parent.querySelector("#nuvioTizenAvplayHost");
+    if (!(host instanceof HTMLElement)) {
+      host = document.createElement("div");
+      host.id = "nuvioTizenAvplayHost";
+      host.style.position = "absolute";
+      host.style.left = "0";
+      host.style.top = "0";
+      host.style.right = "0";
+      host.style.bottom = "0";
+      host.style.width = "100%";
+      host.style.height = "100%";
+      host.style.background = "black";
+      host.style.overflow = "hidden";
+      host.style.pointerEvents = "none";
+      host.style.zIndex = "0";
+      parent.insertBefore(host, videoElement);
+    }
+    let objectNode = host.querySelector('object[type="application/avplayer"]');
+    if (!(objectNode instanceof HTMLElement)) {
+      objectNode = document.createElement("object");
+      objectNode.type = "application/avplayer";
+      objectNode.style.display = "block";
+      objectNode.style.width = "100%";
+      objectNode.style.height = "100%";
+      objectNode.style.background = "black";
+      objectNode.style.pointerEvents = "none";
+      host.appendChild(objectNode);
+    }
+    videoElement.style.position = "absolute";
+    videoElement.style.left = "0";
+    videoElement.style.top = "0";
+    videoElement.style.width = "100%";
+    videoElement.style.height = "100%";
+    videoElement.style.background = "transparent";
+    videoElement.style.opacity = "0";
+    videoElement.style.pointerEvents = "none";
+    videoElement.style.zIndex = "0";
+  }
   var tizenAdapter = {
     name: "tizen",
     init() {
@@ -4530,7 +4579,11 @@
         tizenAvplay: Boolean(getAvplayApi2())
       };
     },
-    prepareVideoElement() {
+    prepareVideoElement(videoElement) {
+      if (!getAvplayApi2()) {
+        return;
+      }
+      ensureAvplayHost(videoElement);
     }
   };
 
@@ -11712,18 +11765,22 @@
       if (!avplay) {
         return;
       }
+      const displayTarget = document.getElementById("nuvioTizenAvplayHost") || this.video;
+      const rect = typeof (displayTarget == null ? void 0 : displayTarget.getBoundingClientRect) === "function" ? displayTarget.getBoundingClientRect() : null;
       const documentWidth = Number(((_a = document.documentElement) == null ? void 0 : _a.clientWidth) || 0);
       const documentHeight = Number(((_b = document.documentElement) == null ? void 0 : _b.clientHeight) || 0);
       const screenWidth = Number(((_c = globalThis.screen) == null ? void 0 : _c.width) || 0);
       const screenHeight = Number(((_d = globalThis.screen) == null ? void 0 : _d.height) || 0);
-      const width = Math.max(1, Math.round(Math.max(Number(window.innerWidth || 0), documentWidth, screenWidth, 1920)));
-      const height = Math.max(1, Math.round(Math.max(Number(window.innerHeight || 0), documentHeight, screenHeight, 1080)));
+      const x = Math.max(0, Math.round(Number((rect == null ? void 0 : rect.left) || 0)));
+      const y = Math.max(0, Math.round(Number((rect == null ? void 0 : rect.top) || 0)));
+      const width = Math.max(1, Math.round(Math.max(Number((rect == null ? void 0 : rect.width) || 0), Number(window.innerWidth || 0), documentWidth, screenWidth, 1920)));
+      const height = Math.max(1, Math.round(Math.max(Number((rect == null ? void 0 : rect.height) || 0), Number(window.innerHeight || 0), documentHeight, screenHeight, 1080)));
       try {
-        (_e = avplay.setDisplayRect) == null ? void 0 : _e.call(avplay, 0, 0, width, height);
+        (_e = avplay.setDisplayRect) == null ? void 0 : _e.call(avplay, x, y, width, height);
       } catch (_) {
       }
       try {
-        (_f = avplay.setDisplayMethod) == null ? void 0 : _f.call(avplay, "PLAYER_DISPLAY_MODE_FULL_SCREEN");
+        (_f = avplay.setDisplayMethod) == null ? void 0 : _f.call(avplay, "PLAYER_DISPLAY_MODE_LETTER_BOX");
       } catch (_) {
       }
     },
@@ -15862,6 +15919,9 @@
       const root = document.createElement("div");
       root.id = "playerUiRoot";
       root.className = "player-ui-root";
+      if (Platform.isTizen() && typeof PlayerController.canUseAvPlay === "function" && PlayerController.canUseAvPlay()) {
+        root.classList.add("player-ui-root-tizen-avplay");
+      }
       if (this.isExternalFrameMode()) {
         root.innerHTML = `
         <div class="player-external-frame-shell">
@@ -16691,6 +16751,14 @@
           this.focusProgressBar();
         }
         this.resetControlsAutoHide();
+        if (Platform.isTizen() && typeof PlayerController.canUseAvPlay === "function" && PlayerController.canUseAvPlay()) {
+          clearTimeout(this.tizenOverlayCompactTimer);
+          this.tizenOverlayCompactTimer = setTimeout(() => {
+            if (!this.paused && !this.isDialogOpen() && !this.seekOverlayVisible) {
+              this.setControlsVisible(false);
+            }
+          }, 1400);
+        }
         this.maybeShowParentalGuideOverlay();
         setTimeout(() => {
           this.attemptSilentAudioRecovery("playing");
@@ -17014,6 +17082,10 @@
         clearTimeout(this.controlsHideTimer);
         this.controlsHideTimer = null;
       }
+      if (this.tizenOverlayCompactTimer) {
+        clearTimeout(this.tizenOverlayCompactTimer);
+        this.tizenOverlayCompactTimer = null;
+      }
     },
     resetControlsAutoHide() {
       this.clearControlsAutoHide();
@@ -17022,7 +17094,7 @@
       }
       this.controlsHideTimer = setTimeout(() => {
         this.setControlsVisible(false);
-      }, 4200);
+      }, Platform.isTizen() && typeof PlayerController.canUseAvPlay === "function" && PlayerController.canUseAvPlay() ? 2200 : 4200);
     },
     getPlaybackCurrentSeconds() {
       var _a;

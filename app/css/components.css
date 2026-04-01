@@ -7263,6 +7263,180 @@ button:focus-visible {
   display: none;
 }
 
+#playerUiRoot.player-ui-root-tizen-avplay .player-loading-center {
+  width: 700px;
+  max-width: calc(100vw - 128px);
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-loading-logo {
+  max-width: 320px;
+  max-height: 120px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-loading-title {
+  font-size: 30px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-loading-subtitle {
+  font-size: 18px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-loading-status {
+  margin-top: 12px;
+  padding: 10px 14px;
+  font-size: 16px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-debug-state {
+  left: 20px;
+  right: 20px;
+  top: 20px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-controls-overlay {
+  padding: 24px 28px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-controls-top {
+  text-align: center;
+  align-self: center;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-clock {
+  font-size: 24px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-ends-at {
+  font-size: 13px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-controls-bottom {
+  padding-top: 24px;
+  gap: 10px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-meta {
+  max-width: 840px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-title {
+  font-size: 34px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-subtitle {
+  margin-top: 2px;
+  font-size: 19px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-meta-tertiary {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-progress-track {
+  height: 6px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-progress-shell.focused .player-progress-track {
+  height: 10px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-controls-row {
+  margin-top: 12px;
+  gap: 16px;
+  align-items: center;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-control-buttons {
+  gap: 10px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-control-btn {
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-control-icon {
+  width: 22px;
+  height: 22px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-control-label {
+  font-size: 13px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-time-label {
+  font-size: 16px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-seek-overlay {
+  left: 28px;
+  right: 28px;
+  bottom: 28px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-seek-overlay-track {
+  height: 6px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-seek-overlay-bottom {
+  margin-top: 10px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-seek-direction,
+#playerUiRoot.player-ui-root-tizen-avplay .player-seek-preview {
+  font-size: 15px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-overlay-top {
+  top: 24px;
+  width: calc(100vw - 56px);
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-overlay-clock {
+  font-size: 24px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-overlay-ends-at {
+  font-size: 13px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-overlay-content {
+  width: 680px;
+  max-width: calc(100vw - 96px);
+  gap: 10px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-kicker {
+  font-size: 13px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-logo {
+  max-width: 320px;
+  max-height: 88px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-title {
+  font-size: 34px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-meta-line {
+  font-size: 15px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-episode-title {
+  font-size: 22px;
+}
+
+#playerUiRoot.player-ui-root-tizen-avplay .player-pause-description {
+  max-width: 560px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
 .player-controls-overlay {
   position: absolute;
   inset: 0;
