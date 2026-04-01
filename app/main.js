@@ -1,6 +1,6 @@
 (function openHostedNuvioTvBuild() {
-  var launcherBuild = "2026-04-01a";
-  var hostedAppUrl = "https://web.nuvioapp.space/";
+  var launcherBuild = "2026-04-01b";
+  var hostedAppUrl = "https://cdn.jsdelivr.net/gh/bekabonsa/n/site/index.html";
   var tvInput = window.tizen && window.tizen.tvinputdevice;
   var buildNode = document.getElementById("launcher-build");
 
@@ -11,6 +11,7 @@
   function buildFreshHostedUrl() {
     try {
       var url = new URL(hostedAppUrl);
+      url.searchParams.set("bootDebug", "1");
       url.searchParams.set("source", "tizenbrew");
       url.searchParams.set("wrapper", "tizen");
       url.searchParams.set("launcher_build", launcherBuild);

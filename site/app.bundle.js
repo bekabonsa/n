@@ -39055,6 +39055,27 @@ ${normalized}`;
   // js/app.js
   init_localStore();
   var GUEST_QR_BYPASS_KEY3 = "skipAuthQrGate";
+  function setBootDebugStatus(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.setStatus) == null ? void 0 : _b.call(_a, message);
+    } catch (_) {
+    }
+  }
+  function failBootDebugStatus(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.fail) == null ? void 0 : _b.call(_a, message);
+    } catch (_) {
+    }
+  }
+  function finishBootDebugStatus(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _a.done) == null ? void 0 : _b.call(_a, message);
+    } catch (_) {
+    }
+  }
   function formatErrorMessage(error) {
     if (!error) {
       return "Unknown error";
@@ -39066,6 +39087,7 @@ ${normalized}`;
   }
   function renderFatalError(error) {
     const message = formatErrorMessage(error);
+    failBootDebugStatus(`Fatal startup error: ${message}`);
     document.body.innerHTML = `
     <div style="min-height:100vh;background:#0f1115;color:#f4f7fb;padding:48px;font-family:Arial,sans-serif;">
       <div style="max-width:960px;margin:0 auto;">
@@ -39098,22 +39120,34 @@ ${normalized}`;
   }
   function bootstrapApp() {
     return __async(this, null, function* () {
+      setBootDebugStatus("Rendering app shell...");
       renderAppShell();
+      setBootDebugStatus("Initializing platform...");
       Platform.init();
+      setBootDebugStatus(`Platform ready: ${Platform.getName()}. Applying performance mode...`);
       applyPerformanceMode();
+      setBootDebugStatus("Loading translations...");
       yield I18n.init();
+      setBootDebugStatus("Initializing router...");
       Router.init();
+      setBootDebugStatus("Initializing player controller...");
       PlayerController.init();
+      setBootDebugStatus("Initializing focus engine...");
       FocusEngine.init();
+      setBootDebugStatus("Applying theme...");
       ThemeManager.apply();
+      setBootDebugStatus("Applying translations...");
       I18n.apply();
+      setBootDebugStatus("Warming playback libraries...");
       warmStreamingLibs({ delayMs: 1400 });
       AuthManager.subscribe((state) => {
         if (state === AuthState.LOADING) {
+          setBootDebugStatus("Auth bootstrap running...");
           StartupSyncService.stop();
           return;
         }
         if (state === AuthState.SIGNED_OUT) {
+          setBootDebugStatus("Auth state: signed out.");
           StartupSyncService.stop();
           const shouldBypassQr = Boolean(LocalStore.get(GUEST_QR_BYPASS_KEY3, false));
           const landingRoute = shouldBypassQr ? "home" : getSignedOutLandingRoute();
@@ -39124,25 +39158,33 @@ ${normalized}`;
                 skipStackPush: true
               });
             }
+            finishBootDebugStatus("Startup finished on home.");
             return;
           }
           const hasSeenQr = LocalStore.get("hasSeenAuthQrOnFirstLaunch");
           Router.navigate(getPrimarySignInRoute(), {
             onboardingMode: !hasSeenQr
           });
+          finishBootDebugStatus(`Startup finished on ${getPrimarySignInRoute()}.`);
         }
         if (state === AuthState.AUTHENTICATED) {
+          setBootDebugStatus("Auth state: authenticated.");
           LocalStore.remove(GUEST_QR_BYPASS_KEY3);
           StartupSyncService.start();
           Router.navigate("profileSelection");
+          finishBootDebugStatus("Startup finished on profile selection.");
         }
       });
+      setBootDebugStatus("Bootstrapping auth...");
       yield AuthManager.bootstrap();
+      setBootDebugStatus("Auth bootstrap completed.");
     });
   }
   function bootstrapAddonRemoteMode() {
     return __async(this, null, function* () {
+      setBootDebugStatus("Rendering addon remote mode...");
       yield renderAddonRemotePage();
+      finishBootDebugStatus("Addon remote mode ready.");
     });
   }
   if (document.readyState === "loading") {

@@ -11,10 +11,70 @@
   <link rel="stylesheet" href="css/themes.css" />
 </head>
 <body>
-  <script src="nuvio.env.js"></script>
-  <script src="js/runtime/polyfills.js"></script>
-  <script src="js/runtime/env.js"></script>
-  <script src="assets/libs/qrcode-generator.js"></script>
-  <script defer src="app.bundle.js"></script>
+  <script>
+    (function initBootDebug() {
+      var root = typeof globalThis !== "undefined" ? globalThis : window;
+      var enabled = false;
+
+      try {
+        var params = new URLSearchParams(window.location.search);
+        enabled = params.get("bootDebug") === "1";
+      } catch (_) {}
+
+      if (!enabled) {
+        root.__NUVIO_BOOT_DEBUG__ = {
+          enabled: false,
+          setStatus: function noop() {},
+          fail: function noop() {},
+          done: function noop() {}
+        };
+        return;
+      }
+
+      var node = document.createElement("div");
+      node.id = "nuvio-boot-debug";
+      node.style.position = "fixed";
+      node.style.left = "24px";
+      node.style.bottom = "24px";
+      node.style.zIndex = "999999";
+      node.style.maxWidth = "calc(100vw - 48px)";
+      node.style.padding = "14px 18px";
+      node.style.borderRadius = "14px";
+      node.style.background = "rgba(0, 0, 0, 0.82)";
+      node.style.color = "#fff";
+      node.style.font = "600 20px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      node.style.letterSpacing = "0.02em";
+      node.style.boxShadow = "0 10px 30px rgba(0, 0, 0, 0.35)";
+      node.textContent = "Boot debug active.";
+      document.addEventListener("DOMContentLoaded", function onReady() {
+        document.body.appendChild(node);
+      }, { once: true });
+
+      function setStatus(message, isError) {
+        node.textContent = String(message || "");
+        node.style.background = isError ? "rgba(120, 0, 0, 0.92)" : "rgba(0, 0, 0, 0.82)";
+      }
+
+      root.__NUVIO_BOOT_DEBUG__ = {
+        enabled: true,
+        setStatus: function setBootStatus(message) {
+          setStatus(message, false);
+        },
+        fail: function failBootStatus(message) {
+          setStatus(message, true);
+        },
+        done: function finishBootStatus(message) {
+          setStatus(message || "App shell ready.", false);
+        }
+      };
+
+      root.__NUVIO_BOOT_DEBUG__.setStatus("Loading runtime config...");
+    }());
+  </script>
+  <script src="nuvio.env.js" onload="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.setStatus('Loaded runtime config. Loading polyfills...')" onerror="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.fail('Failed to load runtime config.')"></script>
+  <script src="js/runtime/polyfills.js" onload="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.setStatus('Loaded polyfills. Loading runtime env...')" onerror="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.fail('Failed to load polyfills.')"></script>
+  <script src="js/runtime/env.js" onload="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.setStatus('Loaded runtime env. Loading QR library...')" onerror="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.fail('Failed to load runtime env.')"></script>
+  <script src="assets/libs/qrcode-generator.js" onload="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.setStatus('Loaded QR library. Loading app bundle...')" onerror="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.fail('Failed to load QR library.')"></script>
+  <script defer src="app.bundle.js" onload="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.setStatus('App bundle loaded. Waiting for bootstrap...')" onerror="window.__NUVIO_BOOT_DEBUG__ && window.__NUVIO_BOOT_DEBUG__.fail('Failed to load app bundle.')"></script>
 </body>
 </html>
