@@ -2197,6 +2197,7 @@ export const PlayerScreen = {
             ${this.params.playerLogoUrl ? `<img class="player-loading-logo" src="${this.params.playerLogoUrl}" alt="logo" />` : ""}
             <div class="player-loading-title">${escapeHtml(this.params.playerTitle || this.params.itemId || "Nuvio")}</div>
             ${this.params.playerSubtitle ? `<div class="player-loading-subtitle">${escapeHtml(this.params.playerSubtitle)}</div>` : ""}
+            <div id="playerLoadingStatus" class="player-loading-status hidden"></div>
           </div>
         </div>
 
@@ -2277,6 +2278,7 @@ export const PlayerScreen = {
     this.uiRefs = uiRoot ? {
       root: uiRoot,
       loadingOverlay: uiRoot.querySelector("#playerLoadingOverlay"),
+      loadingStatus: uiRoot.querySelector("#playerLoadingStatus"),
       parentalGuide: uiRoot.querySelector("#playerParentalGuide"),
       skipIntro: uiRoot.querySelector("#playerSkipIntro"),
       aspectToast: uiRoot.querySelector("#playerAspectToast"),
@@ -3530,16 +3532,23 @@ export const PlayerScreen = {
 
   updateLoadingVisibility() {
     const overlay = this.uiRefs?.loadingOverlay;
+    const statusNode = this.uiRefs?.loadingStatus;
     if (!overlay) {
       return;
     }
+    const statusText = String(this.sourcesError || "").trim();
+    const showOverlay = Boolean(this.loadingVisible || statusText);
     const showLogoOnly = Boolean(
       this.loadingVisible
       && this.hasPresentedPlaybackFrame
       && this.params?.playerLogoUrl
     );
-    overlay.classList.toggle("hidden", !this.loadingVisible);
+    overlay.classList.toggle("hidden", !showOverlay);
     overlay.classList.toggle("logo-only", showLogoOnly);
+    if (statusNode) {
+      statusNode.textContent = statusText;
+      statusNode.classList.toggle("hidden", !statusText);
+    }
     if (this.loadingVisible) {
       this.dismissPauseOverlay();
       if (this.seekOverlayVisible || this.seekPreviewSeconds != null) {

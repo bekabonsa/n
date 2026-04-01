@@ -8,6 +8,7 @@ import { dashJsEngine } from "./engines/dashJsEngine.js";
 import { resolvePlatformAvplayEngine } from "./engines/platformAvplayEngine.js";
 import { WebOsLunaService } from "../../platform/webos/webosLunaService.js";
 import { loadStreamingLibs } from "../../runtime/loadStreamingLibs.js";
+import { PREFERRED_PLAYBACK_ORDER } from "../../config.js";
 
 export const PlayerController = {
 
@@ -1211,6 +1212,53 @@ export const PlayerController = {
     return candidates;
   },
 
+  normalizeConfiguredPlaybackEngineName(name) {
+    const normalized = String(name || "").trim().toLowerCase();
+    if (!normalized) {
+      return "";
+    }
+    if (normalized === "platform-avplay" || normalized === "avplay") {
+      return this.getPlatformAvplayEngineName();
+    }
+    return normalized;
+  },
+
+  orderPlaybackCandidates(candidates = [], url = this.currentPlaybackUrl, sourceType = null) {
+    const available = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+    if (!available.length) {
+      return [];
+    }
+
+    const ordered = [];
+    const pushUnique = (candidate) => {
+      const normalized = String(candidate || "").trim();
+      if (!normalized || ordered.includes(normalized) || !available.includes(normalized)) {
+        return;
+      }
+      ordered.push(normalized);
+    };
+
+    const avplayEngine = this.getPlatformAvplayEngineName();
+    const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+    const isDirectTizenFile = Platform.isTizen()
+      && this.canUseAvPlay()
+      && this.isLikelyDirectFileUrl(url)
+      && !this.isLikelyHlsMimeType(normalizedSourceType)
+      && !this.isLikelyDashMimeType(normalizedSourceType)
+      && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+
+    if (isDirectTizenFile) {
+      pushUnique(avplayEngine);
+    }
+
+    PREFERRED_PLAYBACK_ORDER
+      .map((entry) => this.normalizeConfiguredPlaybackEngineName(entry))
+      .forEach(pushUnique);
+
+    available.forEach(pushUnique);
+    return ordered;
+  },
+
   getAlternativePlaybackEngine(url = this.currentPlaybackUrl, sourceType = this.currentPlaybackMediaSourceType, itemType = this.currentItemType) {
     const normalizedUrl = String(url || "").trim();
     if (!normalizedUrl) {
@@ -2015,7 +2063,11 @@ export const PlayerController = {
   },
 
   choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
-    const candidates = this.getPlaybackEngineCandidates(url, sourceType, itemType);
+    const candidates = this.orderPlaybackCandidates(
+      this.getPlaybackEngineCandidates(url, sourceType, itemType),
+      url,
+      sourceType
+    );
     if (candidates.length) {
       return candidates[0];
     }

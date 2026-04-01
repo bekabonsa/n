@@ -7213,6 +7213,23 @@ button:focus-visible {
   color: rgba(242, 247, 254, 0.9);
 }
 
+.player-loading-status {
+  margin: 18px auto 0;
+  max-width: min(80vw, 920px);
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 245, 245, 0.96);
+  font-size: 20px;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.player-loading-status.hidden {
+  display: none;
+}
+
 .player-controls-overlay {
   position: absolute;
   inset: 0;

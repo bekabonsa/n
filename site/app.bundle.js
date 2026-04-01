@@ -11046,6 +11046,7 @@
   }
 
   // js/core/player/playerController.js
+  init_config();
   var PlayerController = {
     video: null,
     isPlaying: false,
@@ -12101,6 +12102,39 @@
       }
       return candidates;
     },
+    normalizeConfiguredPlaybackEngineName(name) {
+      const normalized = String(name || "").trim().toLowerCase();
+      if (!normalized) {
+        return "";
+      }
+      if (normalized === "platform-avplay" || normalized === "avplay") {
+        return this.getPlatformAvplayEngineName();
+      }
+      return normalized;
+    },
+    orderPlaybackCandidates(candidates = [], url = this.currentPlaybackUrl, sourceType = null) {
+      const available = Array.isArray(candidates) ? candidates.filter(Boolean) : [];
+      if (!available.length) {
+        return [];
+      }
+      const ordered = [];
+      const pushUnique = (candidate) => {
+        const normalized = String(candidate || "").trim();
+        if (!normalized || ordered.includes(normalized) || !available.includes(normalized)) {
+          return;
+        }
+        ordered.push(normalized);
+      };
+      const avplayEngine = this.getPlatformAvplayEngineName();
+      const normalizedSourceType = String(sourceType || this.guessMediaMimeType(url) || "").trim();
+      const isDirectTizenFile = Platform.isTizen() && this.canUseAvPlay() && this.isLikelyDirectFileUrl(url) && !this.isLikelyHlsMimeType(normalizedSourceType) && !this.isLikelyDashMimeType(normalizedSourceType) && !this.isLikelySmoothStreamingMimeType(normalizedSourceType);
+      if (isDirectTizenFile) {
+        pushUnique(avplayEngine);
+      }
+      PREFERRED_PLAYBACK_ORDER.map((entry) => this.normalizeConfiguredPlaybackEngineName(entry)).forEach(pushUnique);
+      available.forEach(pushUnique);
+      return ordered;
+    },
     getAlternativePlaybackEngine(url = this.currentPlaybackUrl, sourceType = this.currentPlaybackMediaSourceType, itemType = this.currentItemType) {
       const normalizedUrl = String(url || "").trim();
       if (!normalizedUrl) {
@@ -12830,7 +12864,11 @@
       });
     },
     choosePlaybackEngine(url, sourceType, itemType = this.currentItemType) {
-      const candidates = this.getPlaybackEngineCandidates(url, sourceType, itemType);
+      const candidates = this.orderPlaybackCandidates(
+        this.getPlaybackEngineCandidates(url, sourceType, itemType),
+        url,
+        sourceType
+      );
       if (candidates.length) {
         return candidates[0];
       }
@@ -15824,6 +15862,7 @@
             ${this.params.playerLogoUrl ? `<img class="player-loading-logo" src="${this.params.playerLogoUrl}" alt="logo" />` : ""}
             <div class="player-loading-title">${escapeHtml3(this.params.playerTitle || this.params.itemId || "Nuvio")}</div>
             ${this.params.playerSubtitle ? `<div class="player-loading-subtitle">${escapeHtml3(this.params.playerSubtitle)}</div>` : ""}
+            <div id="playerLoadingStatus" class="player-loading-status hidden"></div>
           </div>
         </div>
 
@@ -15903,6 +15942,7 @@
       this.uiRefs = uiRoot ? {
         root: uiRoot,
         loadingOverlay: uiRoot.querySelector("#playerLoadingOverlay"),
+        loadingStatus: uiRoot.querySelector("#playerLoadingStatus"),
         parentalGuide: uiRoot.querySelector("#playerParentalGuide"),
         skipIntro: uiRoot.querySelector("#playerSkipIntro"),
         aspectToast: uiRoot.querySelector("#playerAspectToast"),
@@ -17005,16 +17045,23 @@
       }
     },
     updateLoadingVisibility() {
-      var _a, _b;
+      var _a, _b, _c;
       const overlay = (_a = this.uiRefs) == null ? void 0 : _a.loadingOverlay;
+      const statusNode = (_b = this.uiRefs) == null ? void 0 : _b.loadingStatus;
       if (!overlay) {
         return;
       }
+      const statusText = String(this.sourcesError || "").trim();
+      const showOverlay = Boolean(this.loadingVisible || statusText);
       const showLogoOnly = Boolean(
-        this.loadingVisible && this.hasPresentedPlaybackFrame && ((_b = this.params) == null ? void 0 : _b.playerLogoUrl)
+        this.loadingVisible && this.hasPresentedPlaybackFrame && ((_c = this.params) == null ? void 0 : _c.playerLogoUrl)
       );
-      overlay.classList.toggle("hidden", !this.loadingVisible);
+      overlay.classList.toggle("hidden", !showOverlay);
       overlay.classList.toggle("logo-only", showLogoOnly);
+      if (statusNode) {
+        statusNode.textContent = statusText;
+        statusNode.classList.toggle("hidden", !statusText);
+      }
       if (this.loadingVisible) {
         this.dismissPauseOverlay();
         if (this.seekOverlayVisible || this.seekPreviewSeconds != null) {
