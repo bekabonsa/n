@@ -7235,6 +7235,30 @@ button:focus-visible {
   display: none;
 }
 
+.player-debug-state {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  top: 28px;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.72);
+  color: rgba(245, 249, 255, 0.98);
+  font-family: Menlo, Monaco, "Courier New", monospace;
+  font-size: 16px;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+}
+
+.player-debug-state.hidden {
+  display: none;
+}
+
 .player-controls-overlay {
   position: absolute;
   inset: 0;

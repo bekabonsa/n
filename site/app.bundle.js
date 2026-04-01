@@ -15866,6 +15866,8 @@
           </div>
         </div>
 
+        <div id="playerDebugState" class="player-debug-state hidden"></div>
+
         <div id="playerParentalGuide" class="player-parental-guide hidden"></div>
         <div id="playerSkipIntro" class="player-skip-intro hidden"></div>
 
@@ -15943,6 +15945,7 @@
         root: uiRoot,
         loadingOverlay: uiRoot.querySelector("#playerLoadingOverlay"),
         loadingStatus: uiRoot.querySelector("#playerLoadingStatus"),
+        debugState: uiRoot.querySelector("#playerDebugState"),
         parentalGuide: uiRoot.querySelector("#playerParentalGuide"),
         skipIntro: uiRoot.querySelector("#playerSkipIntro"),
         aspectToast: uiRoot.querySelector("#playerAspectToast"),
@@ -17077,6 +17080,7 @@
         this.schedulePauseOverlay();
       }
       this.renderNextEpisodeCard();
+      this.updateDebugStateBadge();
     },
     renderNextEpisodeCard() {
       var _a, _b;
@@ -17089,6 +17093,7 @@
       card.classList.toggle("hidden", hidden);
       if (hidden) {
         card.innerHTML = "";
+        this.updateDebugStateBadge();
         return;
       }
       const titleLine = [nextEpisode.episodeLabel, nextEpisode.episodeTitle].filter(Boolean).join(" \u2022 ");
@@ -17110,6 +17115,56 @@
         </div>
       </div>
     `;
+      this.updateDebugStateBadge();
+    },
+    getPlayerDebugStateLabel() {
+      const statusText = String(this.sourcesError || "").trim();
+      const engine = String(PlayerController.playbackEngine || "none").trim() || "none";
+      let state = "PLAYING";
+      if (this.sourcesPanelVisible) {
+        state = "SOURCES_PANEL";
+      } else if (this.subtitleDialogVisible) {
+        state = "SUBTITLE_DIALOG";
+      } else if (this.audioDialogVisible) {
+        state = "AUDIO_DIALOG";
+      } else if (this.speedDialogVisible) {
+        state = "SPEED_DIALOG";
+      } else if (statusText && this.loadingVisible) {
+        state = "ERROR_LOADING";
+      } else if (statusText) {
+        state = "ERROR";
+      } else if (this.loadingVisible && this.hasPresentedPlaybackFrame) {
+        state = "LOADING_AFTER_FRAME";
+      } else if (this.loadingVisible) {
+        state = "LOADING_BEFORE_FRAME";
+      } else if (this.pauseOverlayVisible) {
+        state = "PAUSE_OVERLAY";
+      } else if (this.seekOverlayVisible) {
+        state = "SEEK_OVERLAY";
+      } else if (this.isNextEpisodeCardVisible()) {
+        state = "NEXT_EPISODE";
+      } else if (this.controlsVisible) {
+        state = "CONTROLS";
+      }
+      return [
+        `state=${state}`,
+        `engine=${engine}`,
+        `frame=${this.hasPresentedPlaybackFrame ? "yes" : "no"}`,
+        statusText ? `msg=${statusText}` : ""
+      ].filter(Boolean).join(" | ");
+    },
+    updateDebugStateBadge() {
+      var _a, _b;
+      const node = (_a = this.uiRefs) == null ? void 0 : _a.debugState;
+      if (!node) {
+        return;
+      }
+      const enabled = Boolean((_b = globalThis.__NUVIO_BOOT_DEBUG__) == null ? void 0 : _b.enabled);
+      node.classList.toggle("hidden", !enabled);
+      if (!enabled) {
+        return;
+      }
+      node.textContent = this.getPlayerDebugStateLabel();
     },
     updateUiTick() {
       var _a, _b, _c, _d;
@@ -17176,6 +17231,7 @@
       }
       this.syncPauseOverlayState();
       this.renderNextEpisodeCard();
+      this.updateDebugStateBadge();
       if (this.seekOverlayVisible && this.seekPreviewSeconds == null) {
         this.renderSeekOverlay();
       }
@@ -20009,6 +20065,7 @@ ${normalized}`;
       panel.classList.toggle("hidden", !this.sourcesPanelVisible);
       if (!this.sourcesPanelVisible) {
         panel.innerHTML = "";
+        this.updateDebugStateBadge();
         return;
       }
       const filters = this.getSourceFilters();
@@ -20069,6 +20126,7 @@ ${normalized}`;
       if (focusedCard) {
         focusedCard.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
+      this.updateDebugStateBadge();
     },
     moveSourcesFocus(direction) {
       const filters = this.getSourceFilters();
