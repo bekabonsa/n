@@ -1,6 +1,7 @@
 (function openHostedNuvioTvBuild() {
-  var launcherBuild = "2026-04-01d";
-  var hostedAppUrl = "https://rawcdn.githack.com/bekabonsa/n/ffb517f/site/index.html";
+  var hostedAppUrl = "https://rawcdn.githack.com/bekabonsa/n/d29eb67/site/index.html";
+  var launcherBuildMatch = hostedAppUrl.match(/\/([0-9a-f]{7,40})\/site\/index\.html$/i);
+  var launcherBuild = launcherBuildMatch ? launcherBuildMatch[1] : "unknown";
   var tvInput = window.tizen && window.tizen.tvinputdevice;
   var buildNode = document.getElementById("launcher-build");
 
