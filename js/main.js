@@ -63,6 +63,9 @@ var state = {
     searchSeries: [],
     selectedItem: null,
     selectedType: null,
+    allSeriesVideos: [],
+    availableSeasons: [],
+    selectedSeason: null,
     selectedEpisodes: [],
     selectedVideo: null,
     streams: [],
@@ -841,9 +844,13 @@ function getMainRows() {
 
     if (state.currentView === 'addons') {
         var addonRows = [];
+        var seasons = queryAll('#seasonRail .season-chip');
         var episodes = queryAll('#episodeRail .episode-chip');
         var streams = queryAll('#streamList .stream-card');
 
+        if (seasons.length) {
+            addonRows.push(seasons);
+        }
         if (episodes.length) {
             addonRows.push(episodes);
         }
@@ -911,6 +918,7 @@ function scrollElementIntoView(el) {
 
     if (parent && parent.classList && (
         parent.classList.contains('rail') ||
+        parent.classList.contains('season-rail') ||
         parent.classList.contains('episode-rail') ||
         parent.classList.contains('genre-chip-row') ||
         parent.id === 'playerActions' ||
@@ -1035,6 +1043,67 @@ function formatMetaLine(item, kind) {
         item.releaseInfo || item.year || '',
         item.imdbRating ? 'IMDb ' + item.imdbRating : ''
     ].filter(Boolean).join(' • ');
+}
+
+function getVideoSeason(video) {
+    var season = video && (video.season || video.seasonNumber);
+    if (typeof season === 'number' && !isNaN(season)) {
+        return season;
+    }
+    if (typeof season === 'string' && season) {
+        season = parseInt(season, 10);
+        if (!isNaN(season)) {
+            return season;
+        }
+    }
+    return 1;
+}
+
+function getVideoEpisode(video) {
+    var episode = video && (video.episode || video.number);
+    if (typeof episode === 'number' && !isNaN(episode)) {
+        return episode;
+    }
+    if (typeof episode === 'string' && episode) {
+        episode = parseInt(episode, 10);
+        if (!isNaN(episode)) {
+            return episode;
+        }
+    }
+    return 0;
+}
+
+function formatSeasonLabel(season) {
+    return 'Season ' + season;
+}
+
+function updateSelectedEpisodesForSeason() {
+    if (state.selectedType !== 'series') {
+        state.selectedEpisodes = [];
+        return;
+    }
+
+    state.selectedEpisodes = state.allSeriesVideos.filter(function(video) {
+        return getVideoSeason(video) === state.selectedSeason;
+    }).sort(function(left, right) {
+        return getVideoEpisode(left) - getVideoEpisode(right);
+    });
+
+    if (!state.selectedEpisodes.length) {
+        state.selectedVideo = null;
+        return;
+    }
+
+    if (!state.selectedVideo || getVideoSeason(state.selectedVideo) !== state.selectedSeason) {
+        state.selectedVideo = state.selectedEpisodes[0];
+        return;
+    }
+
+    if (!state.selectedEpisodes.some(function(video) {
+        return video.id === state.selectedVideo.id;
+    })) {
+        state.selectedVideo = state.selectedEpisodes[0];
+    }
 }
 
 function updateFeatured(item, kind) {
@@ -1515,6 +1584,45 @@ function renderEpisodeRail() {
     });
 }
 
+function renderSeasonRail() {
+    var rail = byId('seasonRail');
+    var section = byId('seasonSection');
+
+    rail.innerHTML = '';
+
+    if (state.selectedType !== 'series' || state.availableSeasons.length < 2) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+
+    state.availableSeasons.forEach(function(season) {
+        var button = document.createElement('button');
+        button.className = 'season-chip';
+        button.type = 'button';
+        button.setAttribute('tabindex', '-1');
+        if (state.selectedSeason === season) {
+            button.classList.add('is-selected');
+        }
+        button.textContent = formatSeasonLabel(season);
+        button.addEventListener('click', function() {
+            if (state.selectedSeason === season) {
+                return;
+            }
+            state.selectedSeason = season;
+            updateSelectedEpisodesForSeason();
+            renderAddons();
+            if (!state.selectedVideo) {
+                setAddonsMessage('No episodes were returned for this season.', 'error');
+                return;
+            }
+            loadStreamsForSelection();
+        });
+        rail.appendChild(button);
+    });
+}
+
 function renderAddons() {
     byId('addonCount').textContent = String(state.addons.length);
     byId('streamCount').textContent = String(state.streams.length);
@@ -1532,10 +1640,13 @@ function renderAddons() {
             state.selectedItem.releaseInfo ||
             'Installed addons and streams for the current selection appear below.';
         byId('selectedVideoLabel').textContent = state.selectedVideo
-            ? (state.selectedVideo.title || state.selectedVideo.name || state.selectedVideo.id)
+            ? (state.selectedType === 'series'
+                ? (formatSeasonLabel(getVideoSeason(state.selectedVideo)) + ' • Episode ' + (getVideoEpisode(state.selectedVideo) || '?'))
+                : (state.selectedVideo.title || state.selectedVideo.name || state.selectedVideo.id))
             : (state.selectedType === 'series' ? 'Choose an episode' : 'Movie stream target');
     }
 
+    renderSeasonRail();
     renderEpisodeRail();
 
     var list = byId('streamList');
@@ -1951,6 +2062,9 @@ function renderCards(containerId, items, kind) {
 function prepareSelection(item, type) {
     state.selectedItem = item;
     state.selectedType = type;
+    state.allSeriesVideos = [];
+    state.availableSeasons = [];
+    state.selectedSeason = null;
     state.selectedEpisodes = [];
     state.selectedVideo = null;
     state.streams = [];
@@ -1975,9 +2089,15 @@ function prepareSelection(item, type) {
         requestJson(CINEMETA_BASE + '/meta/series/' + encodeURIComponent(item.id) + '.json', 'GET')
             .then(function(payload) {
                 var meta = payload && payload.meta ? payload.meta : payload;
+                var seasons;
                 state.selectedItem = meta || item;
-                state.selectedEpisodes = meta && Array.isArray(meta.videos) ? meta.videos.slice(0, 16) : [];
-                state.selectedVideo = state.selectedEpisodes.length ? state.selectedEpisodes[0] : null;
+                state.allSeriesVideos = meta && Array.isArray(meta.videos) ? meta.videos.slice() : [];
+                seasons = uniqueList(state.allSeriesVideos.map(getVideoSeason)).sort(function(left, right) {
+                    return left - right;
+                });
+                state.availableSeasons = seasons;
+                state.selectedSeason = seasons.length ? seasons[0] : null;
+                updateSelectedEpisodesForSeason();
                 renderAddons();
                 if (!state.selectedVideo) {
                     setAddonsMessage('No episode metadata was returned for this series.', 'error');

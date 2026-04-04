@@ -547,6 +547,15 @@ body.is-player-fullscreen .player-layout {
     word-break: break-word;
 }
 
+.season-rail,
+.episode-rail {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+}
+
+.season-chip,
 .episode-chip {
     min-width: 160px;
     min-height: 52px;
@@ -562,6 +571,11 @@ body.is-player-fullscreen .player-layout {
     font-weight: 600;
 }
 
+.season-chip {
+    min-width: 132px;
+}
+
+.season-chip.is-selected,
 .episode-chip.is-selected {
     background: rgba(87, 199, 255, 0.12);
     border-color: rgba(87, 199, 255, 0.28);
@@ -924,6 +938,7 @@ input:focus {
 
 .card:focus,
 .stream-card:focus,
+.season-chip:focus,
 .episode-chip:focus,
 .track-chip:focus,
 .genre-chip:focus,
