@@ -444,7 +444,7 @@ function setPlayerToggleUi(isPlaying) {
 
 function setPlayerFullscreenUi() {
     var button = byId('playerFullscreenButton');
-    byId('playerFullscreenGlyph').textContent = state.playerFullscreen ? '🗗' : '⛶';
+    byId('playerFullscreenGlyph').textContent = state.playerFullscreen ? '⤡' : '⤢';
     button.setAttribute('aria-label', state.playerFullscreen ? 'Windowed' : 'Fullscreen');
     button.setAttribute('title', state.playerFullscreen ? 'Windowed' : 'Fullscreen');
 }
@@ -644,13 +644,20 @@ function stopAvplayPlayback() {
 
 function syncAvplayRect() {
     var surface = byId('avplaySurface');
+    var shell = byId('contentShell');
+    var shellRect;
     var rect;
+    var left;
+    var top;
 
     if (state.playerMode !== 'avplay' || !hasAvplay()) {
         return;
     }
 
     rect = surface.getBoundingClientRect();
+    shellRect = shell ? shell.getBoundingClientRect() : { left: 0, top: 0 };
+    left = state.playerFullscreen ? rect.left : (rect.left - shellRect.left);
+    top = state.playerFullscreen ? rect.top : (rect.top - shellRect.top);
     try {
         try {
             webapis.avplay.setDisplayMethod(state.playerFullscreen
@@ -660,8 +667,8 @@ function syncAvplayRect() {
             // no-op
         }
         webapis.avplay.setDisplayRect(
-            Math.max(0, Math.round(rect.left)),
-            Math.max(0, Math.round(rect.top)),
+            Math.max(0, Math.round(left)),
+            Math.max(0, Math.round(top)),
             Math.max(1, Math.round(rect.width)),
             Math.max(1, Math.round(rect.height))
         );
@@ -1132,17 +1139,21 @@ function getMainRows() {
 
     if (state.currentView === 'player') {
         var playerRows = [];
+        var progressButton = byId('playerProgressButton');
         var playerActions = queryAll('#playerActions .action-button');
         var audioButtons = queryAll('#audioTrackList .track-chip');
         var subtitleButtons = queryAll('#subtitleTrackList .track-chip');
 
         if (state.playerFullscreen) {
             if (document.body.classList.contains('is-player-chrome-visible') && playerActions.length) {
-                return [[byId('videoFrameFocus')], playerActions];
+                return [[byId('videoFrameFocus')], [progressButton], playerActions];
             }
             return [[byId('videoFrameFocus')]];
         }
 
+        if (progressButton) {
+            playerRows.push([progressButton]);
+        }
         if (playerActions.length) {
             playerRows.push(playerActions);
         }
@@ -2578,6 +2589,11 @@ function bindPlayer() {
         seekCurrentPlayback(30000);
     });
 
+    byId('playerProgressButton').addEventListener('click', function() {
+        showPlayerChrome(true);
+        setPlayerStatus('Use left and right to seek');
+    });
+
     byId('playerAudioButton').addEventListener('click', function() {
         cycleAudioTrack();
     });
@@ -2640,10 +2656,18 @@ function bindPlayer() {
 
 function handleLeft() {
     if (state.currentView === 'player' && state.playerFullscreen) {
-        if (state.mainRow === 0) {
+        if (state.mainRow === 1) {
             seekCurrentPlayback(-30000);
             return;
         }
+        if (state.mainRow === 0) {
+            return;
+        }
+        if (state.mainCol > 0) {
+            state.mainCol -= 1;
+            focusCurrent();
+        }
+        return;
     }
 
     if (state.focusRegion === 'nav') {
@@ -2662,10 +2686,16 @@ function handleLeft() {
 
 function handleRight() {
     if (state.currentView === 'player' && state.playerFullscreen) {
-        if (state.mainRow === 0) {
+        if (state.mainRow === 1) {
             seekCurrentPlayback(30000);
             return;
         }
+        if (state.mainRow === 0) {
+            return;
+        }
+        state.mainCol += 1;
+        focusCurrent();
+        return;
     }
 
     if (state.focusRegion === 'nav') {
@@ -2710,6 +2740,7 @@ function handleUp() {
 function handleDown() {
     if (state.currentView === 'player' && state.playerFullscreen) {
         state.mainRow += 1;
+        state.mainCol = 0;
         focusCurrent();
         return;
     }

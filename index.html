@@ -51,7 +51,7 @@
             </div>
         </aside>
 
-        <main class="content-shell">
+        <main class="content-shell" id="contentShell">
             <header class="top-bar">
                 <div>
                     <div class="page-kicker" id="pageEyebrow">Discover</div>
@@ -277,9 +277,11 @@
                                     <div class="player-controller-inner">
                                         <div class="player-progress-meta">
                                             <span class="player-time-value" id="playerCurrentTime">00:00</span>
-                                            <div class="player-progress-rail" aria-hidden="true">
-                                                <div class="player-progress-fill" id="playerProgressFill"></div>
-                                            </div>
+                                            <button class="player-progress-button" id="playerProgressButton" type="button" tabindex="-1" aria-label="Seek bar" title="Seek bar">
+                                                <div class="player-progress-rail" aria-hidden="true">
+                                                    <div class="player-progress-fill" id="playerProgressFill"></div>
+                                                </div>
+                                            </button>
                                             <span class="player-time-value" id="playerDuration">00:00</span>
                                         </div>
                                         <div class="player-progress-caption" id="playerProgressCaption">Idle</div>
@@ -296,7 +298,7 @@
                                                 <span class="player-action-badge">30</span>
                                             </button>
                                             <button class="action-button player-icon-button" id="playerAudioButton" type="button" aria-label="Cycle audio track" title="Cycle audio track">
-                                                <span class="player-action-glyph">🔊</span>
+                                                <span class="player-action-glyph">♫</span>
                                                 <span class="player-action-badge" id="playerAudioBadge">1</span>
                                             </button>
                                             <button class="action-button player-icon-button" id="playerSubtitleButton" type="button" aria-label="Cycle subtitles" title="Cycle subtitles">
@@ -307,7 +309,7 @@
                                                 <span class="player-action-glyph">↻</span>
                                             </button>
                                             <button class="action-button player-icon-button" id="playerFullscreenButton" type="button" aria-label="Fullscreen" title="Fullscreen">
-                                                <span class="player-action-glyph" id="playerFullscreenGlyph">⛶</span>
+                                                <span class="player-action-glyph" id="playerFullscreenGlyph">⤢</span>
                                             </button>
                                             <button class="action-button player-icon-button" id="playerBackButton" type="button" aria-label="Back to addons" title="Back to addons">
                                                 <span class="player-action-glyph">↩</span>
