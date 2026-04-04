@@ -2,6 +2,8 @@ var API_BASE = 'https://api.strem.io';
 var CINEMETA_BASE = 'https://v3-cinemeta.strem.io';
 var STORAGE_AUTH = 'stremio.authKey';
 var STORAGE_USER = 'stremio.user';
+var FALLBACK_MOVIE_GENRES = ['Top', 'Action', 'Comedy', 'Drama', 'Sci-Fi', 'Thriller', 'Animation', 'Documentary'];
+var FALLBACK_SERIES_GENRES = ['Top', 'Drama', 'Comedy', 'Crime', 'Sci-Fi', 'Animation', 'Thriller', 'Documentary'];
 var NAV_VIEWS = ['home', 'movies', 'series', 'search', 'addons', 'player', 'login'];
 var VIEW_META = {
     home: {
@@ -47,6 +49,14 @@ var state = {
     addons: [],
     movies: [],
     series: [],
+    movieGenres: FALLBACK_MOVIE_GENRES.slice(),
+    seriesGenres: FALLBACK_SERIES_GENRES.slice(),
+    selectedMovieGenre: 'Top',
+    selectedSeriesGenre: 'Top',
+    movieBrowseItems: [],
+    seriesBrowseItems: [],
+    movieSkip: 0,
+    seriesSkip: 0,
     searchQuery: '',
     searchScope: 'all',
     searchMovies: [],
@@ -64,6 +74,7 @@ var state = {
     currentTimeMs: 0,
     durationMs: 0,
     playbackTicker: null,
+    playerChromeTimer: null,
     playerMode: 'html5',
     playerFullscreen: false,
     currentView: 'home',
@@ -143,6 +154,21 @@ function setSearchMessage(text, tone) {
 
 function setPlayerStatus(text) {
     byId('playerStatus').textContent = text;
+}
+
+function uniqueList(items) {
+    var seen = {};
+    var output = [];
+
+    items.forEach(function(item) {
+        if (!item || seen[item]) {
+            return;
+        }
+        seen[item] = true;
+        output.push(item);
+    });
+
+    return output;
 }
 
 function updateUserPanel() {
@@ -293,6 +319,25 @@ function stopPlaybackTicker() {
     }
 }
 
+function showPlayerChrome(persist) {
+    var body = document.body;
+
+    body.classList.add('is-player-chrome-visible');
+    if (state.playerChromeTimer) {
+        clearTimeout(state.playerChromeTimer);
+        state.playerChromeTimer = null;
+    }
+
+    if (persist || !state.playerFullscreen) {
+        return;
+    }
+
+    state.playerChromeTimer = setTimeout(function() {
+        document.body.classList.remove('is-player-chrome-visible');
+        state.playerChromeTimer = null;
+    }, 2800);
+}
+
 function startPlaybackTicker() {
     stopPlaybackTicker();
     state.playbackTicker = setInterval(function() {
@@ -309,6 +354,8 @@ function seekCurrentPlayback(deltaMs) {
     var current = state.currentTimeMs || 0;
     var duration = state.durationMs || 0;
     var target = current + deltaMs;
+
+    showPlayerChrome(false);
 
     if (duration > 0) {
         target = Math.min(duration, target);
@@ -599,6 +646,8 @@ function selectAudioTrack(trackId) {
         return;
     }
 
+    showPlayerChrome(false);
+
     if (state.playerMode === 'avplay' && hasAvplay()) {
         try {
             webapis.avplay.setSelectTrack('AUDIO', selectedTrack.index);
@@ -632,6 +681,7 @@ function selectSubtitleTrack(trackId) {
 
     if (state.playerMode === 'avplay' && hasAvplay()) {
         try {
+            showPlayerChrome(false);
             if (trackId === 'subtitle-off') {
                 webapis.avplay.setSilentSubtitle(true);
                 state.activeSubtitleTrack = 'subtitle-off';
@@ -679,7 +729,10 @@ function setPlayerFullscreen(enabled) {
         state.focusRegion = 'main';
         state.mainRow = 0;
         state.mainCol = 0;
+        showPlayerChrome(false);
         setTimeout(focusCurrent, 0);
+    } else {
+        body.classList.add('is-player-chrome-visible');
     }
     setTimeout(syncAvplayRect, 60);
 }
@@ -734,11 +787,33 @@ function getMainRows() {
     }
 
     if (state.currentView === 'movies') {
-        return chunkItems(queryAll('#movieGrid .card'), 4);
+        var movieRows = [];
+        var movieGenres = queryAll('#movieGenreRow .genre-chip');
+        var movieCards = queryAll('#movieGrid .card');
+
+        if (movieGenres.length) {
+            movieRows.push(movieGenres);
+        }
+        if (movieCards.length) {
+            movieRows.push(movieCards);
+        }
+        movieRows.push([byId('movieLoadMoreButton')]);
+        return movieRows;
     }
 
     if (state.currentView === 'series') {
-        return chunkItems(queryAll('#seriesGrid .card'), 4);
+        var seriesRows = [];
+        var seriesGenres = queryAll('#seriesGenreRow .genre-chip');
+        var seriesCards = queryAll('#seriesGrid .card');
+
+        if (seriesGenres.length) {
+            seriesRows.push(seriesGenres);
+        }
+        if (seriesCards.length) {
+            seriesRows.push(seriesCards);
+        }
+        seriesRows.push([byId('seriesLoadMoreButton')]);
+        return seriesRows;
     }
 
     if (state.currentView === 'search') {
@@ -834,7 +909,13 @@ function clampMainFocus(rows) {
 function scrollElementIntoView(el) {
     var parent = el ? el.parentNode : null;
 
-    if (parent && parent.classList && (parent.classList.contains('rail') || parent.classList.contains('episode-rail'))) {
+    if (parent && parent.classList && (
+        parent.classList.contains('rail') ||
+        parent.classList.contains('episode-rail') ||
+        parent.classList.contains('genre-chip-row') ||
+        parent.id === 'playerActions' ||
+        parent.id === 'searchScopeGroup'
+    )) {
         var left = el.offsetLeft - 18;
         var right = el.offsetLeft + el.offsetWidth + 18;
         if (left < parent.scrollLeft) {
@@ -1052,6 +1133,116 @@ function requestJson(url, method, body) {
     });
 }
 
+function fetchCatalogManifest() {
+    return requestJson(CINEMETA_BASE + '/manifest.json', 'GET').then(function(manifest) {
+        var movieCatalog;
+        var seriesCatalog;
+        var movieGenres;
+        var seriesGenres;
+
+        if (!manifest || !manifest.catalogs) {
+            return;
+        }
+
+        movieCatalog = manifest.catalogs.filter(function(catalog) {
+            return catalog.type === 'movie' && catalog.id === 'top';
+        })[0];
+        seriesCatalog = manifest.catalogs.filter(function(catalog) {
+            return catalog.type === 'series' && catalog.id === 'top';
+        })[0];
+
+        movieGenres = ['Top'].concat(movieCatalog && movieCatalog.genres ? movieCatalog.genres.slice(0, 12) : FALLBACK_MOVIE_GENRES.slice(1));
+        seriesGenres = ['Top'].concat(seriesCatalog && seriesCatalog.genres ? seriesCatalog.genres.slice(0, 12) : FALLBACK_SERIES_GENRES.slice(1));
+
+        state.movieGenres = uniqueList(movieGenres);
+        state.seriesGenres = uniqueList(seriesGenres);
+        renderBrowseGenreRows();
+    }).catch(function() {
+        state.movieGenres = FALLBACK_MOVIE_GENRES.slice();
+        state.seriesGenres = FALLBACK_SERIES_GENRES.slice();
+        renderBrowseGenreRows();
+    });
+}
+
+function catalogUrl(type, genre, skip) {
+    var extras = [];
+
+    if (genre && genre !== 'Top') {
+        extras.push('genre=' + encodeURIComponent(genre));
+    }
+    if (skip && skip > 0) {
+        extras.push('skip=' + skip);
+    }
+
+    return CINEMETA_BASE + '/catalog/' + type + '/top' + (extras.length ? '/' + extras.join('&') : '') + '.json';
+}
+
+function renderBrowseGenreRows() {
+    function renderRow(containerId, genres, active, onSelect) {
+        var container = byId(containerId);
+        container.innerHTML = '';
+
+        genres.forEach(function(genre) {
+            var button = document.createElement('button');
+            button.className = 'genre-chip';
+            button.type = 'button';
+            button.setAttribute('tabindex', '-1');
+            if (genre === active) {
+                button.classList.add('is-selected');
+            }
+            button.textContent = genre;
+            button.addEventListener('click', function() {
+                onSelect(genre);
+            });
+            container.appendChild(button);
+        });
+    }
+
+    renderRow('movieGenreRow', state.movieGenres, state.selectedMovieGenre, function(genre) {
+        state.selectedMovieGenre = genre;
+        state.movieSkip = 0;
+        fetchBrowseCatalog('movie', false);
+    });
+
+    renderRow('seriesGenreRow', state.seriesGenres, state.selectedSeriesGenre, function(genre) {
+        state.selectedSeriesGenre = genre;
+        state.seriesSkip = 0;
+        fetchBrowseCatalog('series', false);
+    });
+}
+
+function renderBrowseViews() {
+    renderCards('movieGrid', state.movieBrowseItems, 'movie');
+    renderCards('seriesGrid', state.seriesBrowseItems, 'series');
+
+    byId('movieCount').textContent = state.movieBrowseItems.length + ' loaded • ' + state.selectedMovieGenre;
+    byId('seriesCount').textContent = state.seriesBrowseItems.length + ' loaded • ' + state.selectedSeriesGenre;
+    renderBrowseGenreRows();
+}
+
+function fetchBrowseCatalog(type, append) {
+    var genre = type === 'movie' ? state.selectedMovieGenre : state.selectedSeriesGenre;
+    var skip = type === 'movie' ? state.movieSkip : state.seriesSkip;
+
+    updateConnectionStatus('Loading ' + type + ' browse...', false, false);
+
+    return requestJson(catalogUrl(type, genre, skip), 'GET').then(function(payload) {
+        var items = normalizeCatalogPayloadWithLimit(payload, 24);
+        if (type === 'movie') {
+            state.movieBrowseItems = append ? state.movieBrowseItems.concat(items) : items;
+        } else {
+            state.seriesBrowseItems = append ? state.seriesBrowseItems.concat(items) : items;
+        }
+        renderBrowseViews();
+        updateConnectionStatus('Cinemeta connected', true, false);
+        if ((type === 'movie' && state.currentView === 'movies') || (type === 'series' && state.currentView === 'series')) {
+            setTimeout(focusCurrent, 0);
+        }
+    }).catch(function(error) {
+        updateConnectionStatus('Catalog error: ' + error.message, false, true);
+    });
+}
+
 function fetchCatalogs() {
     updateConnectionStatus('Loading catalogs...', false, false);
 
@@ -1062,8 +1253,14 @@ function fetchCatalogs() {
         state.movies = normalizeCatalogPayload(results[0]);
         state.series = normalizeCatalogPayload(results[1]);
         renderCatalogViews();
-        updateConnectionStatus('Cinemeta connected', true, false);
-        focusCurrent();
+        return Promise.all([
+            fetchCatalogManifest(),
+            fetchBrowseCatalog('movie', false),
+            fetchBrowseCatalog('series', false)
+        ]).then(function() {
+            updateConnectionStatus('Cinemeta connected', true, false);
+            focusCurrent();
+        });
     }).catch(function(error) {
         updateConnectionStatus('Catalog error: ' + error.message, false, true);
         setLoginMessage('Catalog fetch failed: ' + error.message, 'error');
@@ -1535,6 +1732,8 @@ function startAvplayStream(url) {
 function toggleCurrentPlayback() {
     var video = byId('videoPlayer');
 
+    showPlayerChrome(false);
+
     if (!state.currentStream || !state.currentStream.playable || !state.currentStream.raw || !state.currentStream.raw.url) {
         setPlayerStatus('No playable stream selected');
         return;
@@ -1594,6 +1793,7 @@ function openStream(streamEntry) {
         focusRegion: 'main',
         resetMain: true
     });
+    showPlayerChrome(true);
 
     if (streamEntry.playable && streamEntry.raw && streamEntry.raw.url) {
         loadCurrentStream();
@@ -1923,6 +2123,18 @@ function bindSearch() {
     });
 }
 
+function bindBrowse() {
+    byId('movieLoadMoreButton').addEventListener('click', function() {
+        state.movieSkip += 24;
+        fetchBrowseCatalog('movie', true);
+    });
+
+    byId('seriesLoadMoreButton').addEventListener('click', function() {
+        state.seriesSkip += 24;
+        fetchBrowseCatalog('series', true);
+    });
+}
+
 function bindLogin() {
     byId('loginForm').addEventListener('submit', function(event) {
         var email = byId('emailInput').value.trim();
@@ -2119,6 +2331,10 @@ function handleEnter() {
 
 function init() {
     document.addEventListener('keydown', function(event) {
+        if (state.currentView === 'player' && state.playerFullscreen) {
+            showPlayerChrome(false);
+        }
+
         switch (event.keyCode) {
         case 37:
             event.preventDefault();
@@ -2151,6 +2367,7 @@ function init() {
     bindNav();
     bindHomeActions();
     bindSearch();
+    bindBrowse();
     bindLogin();
     bindPlayer();
 

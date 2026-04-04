@@ -250,6 +250,18 @@ body.is-player-fullscreen .player-layout {
 
 .view.is-active {
     display: block;
+    animation: view-slide-in 180ms ease;
+}
+
+@keyframes view-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .featured-panel,
@@ -268,6 +280,7 @@ body.is-player-fullscreen .player-layout {
     gap: 20px;
     padding: 24px;
     margin-bottom: 18px;
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
 .featured-tag {
@@ -355,6 +368,7 @@ body.is-player-fullscreen .player-layout {
     justify-content: center;
     font-size: 18px;
     font-weight: 600;
+    transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .action-primary {
@@ -367,6 +381,7 @@ body.is-player-fullscreen .player-layout {
 .player-stage-card {
     padding: 22px;
     margin-bottom: 18px;
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
 .section-card-fill {
@@ -401,6 +416,49 @@ body.is-player-fullscreen .player-layout {
     padding-bottom: 8px;
 }
 
+.rail-browse {
+    padding-top: 8px;
+}
+
+.browse-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: end;
+    margin: 16px 0 10px;
+}
+
+.browse-actions {
+    justify-content: flex-end;
+}
+
+.genre-chip-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+}
+
+.genre-chip {
+    min-height: 46px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.genre-chip.is-selected {
+    background: rgba(87, 199, 255, 0.12);
+    border-color: rgba(87, 199, 255, 0.22);
+}
+
 .catalog-grid {
     display: flex;
     flex-wrap: wrap;
@@ -419,6 +477,7 @@ body.is-player-fullscreen .player-layout {
     background: transparent;
     color: inherit;
     text-align: left;
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
 .catalog-grid .card {
@@ -635,17 +694,40 @@ body.is-player-fullscreen .video-frame {
     display: none;
 }
 
-body.is-player-fullscreen .player-controller-card,
-body.is-player-fullscreen #playerActions {
-    display: none;
+.player-controller-card {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    padding: 28px 22px 18px;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.player-controller-card {
-    margin: 16px 0 14px;
-    padding: 16px 18px;
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+.player-controller-backdrop {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(2, 5, 10, 0) 0%, rgba(2, 5, 10, 0.78) 52%, rgba(2, 5, 10, 0.96) 100%);
+    pointer-events: none;
+}
+
+.player-controller-inner {
+    position: relative;
+    z-index: 1;
+}
+
+body.is-player-fullscreen .player-controller-card {
+    opacity: 0;
+    transform: translateY(14px);
+    pointer-events: none;
+}
+
+body.is-player-fullscreen.is-player-chrome-visible .player-controller-card {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 .player-progress-meta {
@@ -837,18 +919,20 @@ body.is-player-fullscreen #playerActions {
 button:focus,
 input:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(87, 199, 255, 0.44), 0 0 0 6px rgba(87, 199, 255, 0.12);
+    box-shadow: 0 0 0 2px rgba(87, 199, 255, 0.30), 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .card:focus,
 .stream-card:focus,
 .episode-chip:focus,
 .track-chip:focus,
+.genre-chip:focus,
 .action-button:focus,
 .nav-item:focus,
 .video-frame:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(87, 199, 255, 0.42), 0 10px 22px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 0 0 2px rgba(87, 199, 255, 0.26), 0 10px 22px rgba(0, 0, 0, 0.18);
+    transform: translateY(-1px);
 }
 
 ::-webkit-scrollbar {
