@@ -52,6 +52,9 @@ var state = {
     subtitleTracks: [],
     activeAudioTrack: null,
     activeSubtitleTrack: 'subtitle-off',
+    currentTimeMs: 0,
+    durationMs: 0,
+    playbackTicker: null,
     playerMode: 'html5',
     playerFullscreen: false,
     currentView: 'home',
@@ -184,6 +187,141 @@ function normalizeTrackLabel(type, info, index) {
     return (type === 'audio' ? 'Audio ' : 'Subtitle ') + (index + 1);
 }
 
+function formatPlaybackTime(ms) {
+    var totalSeconds = Math.max(0, Math.floor((ms || 0) / 1000));
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    var pad2 = function(value) {
+        return value < 10 ? '0' + String(value) : String(value);
+    };
+
+    if (hours > 0) {
+        return [
+            String(hours),
+            pad2(minutes),
+            pad2(seconds)
+        ].join(':');
+    }
+
+    return [
+        pad2(minutes),
+        pad2(seconds)
+    ].join(':');
+}
+
+function updateProgressUi() {
+    var percent = 0;
+    if (state.durationMs > 0) {
+        percent = Math.max(0, Math.min(100, (state.currentTimeMs / state.durationMs) * 100));
+    }
+
+    byId('playerCurrentTime').textContent = formatPlaybackTime(state.currentTimeMs);
+    byId('playerDuration').textContent = formatPlaybackTime(state.durationMs);
+    byId('playerProgressFill').style.width = String(percent) + '%';
+    byId('playerProgressCaption').textContent = state.durationMs > 0
+        ? Math.round(percent) + '% watched'
+        : 'Waiting for stream timing...';
+}
+
+function setPlaybackMetrics(currentMs, durationMs) {
+    state.currentTimeMs = Math.max(0, currentMs || 0);
+    state.durationMs = Math.max(0, durationMs || 0);
+    updateProgressUi();
+}
+
+function resetPlaybackMetrics() {
+    state.currentTimeMs = 0;
+    state.durationMs = 0;
+    updateProgressUi();
+}
+
+function readHtml5Metrics() {
+    var video = byId('videoPlayer');
+    var current = isFinite(video.currentTime) ? video.currentTime * 1000 : 0;
+    var duration = isFinite(video.duration) ? video.duration * 1000 : 0;
+    setPlaybackMetrics(current, duration);
+}
+
+function readAvplayMetrics() {
+    var current = 0;
+    var duration = state.durationMs || 0;
+
+    if (!hasAvplay()) {
+        return;
+    }
+
+    try {
+        current = webapis.avplay.getCurrentTime() || 0;
+    } catch (error1) {
+        current = state.currentTimeMs || 0;
+    }
+
+    try {
+        duration = webapis.avplay.getDuration() || duration;
+    } catch (error2) {
+        duration = duration || 0;
+    }
+
+    setPlaybackMetrics(current, duration);
+}
+
+function stopPlaybackTicker() {
+    if (state.playbackTicker) {
+        clearInterval(state.playbackTicker);
+        state.playbackTicker = null;
+    }
+}
+
+function startPlaybackTicker() {
+    stopPlaybackTicker();
+    state.playbackTicker = setInterval(function() {
+        if (state.playerMode === 'avplay') {
+            readAvplayMetrics();
+        } else {
+            readHtml5Metrics();
+        }
+    }, 500);
+}
+
+function seekCurrentPlayback(deltaMs) {
+    var video = byId('videoPlayer');
+    var current = state.currentTimeMs || 0;
+    var duration = state.durationMs || 0;
+    var target = current + deltaMs;
+
+    if (duration > 0) {
+        target = Math.min(duration, target);
+    }
+    target = Math.max(0, target);
+
+    if (state.playerMode === 'avplay' && hasAvplay()) {
+        try {
+            if (duration > 1000) {
+                target = Math.min(duration - 1000, Math.max(1000, target));
+            }
+            webapis.avplay.seekTo(target, function() {
+                setPlaybackMetrics(target, duration);
+                setPlayerStatus((deltaMs < 0 ? 'Rewound to ' : 'Skipped to ') + formatPlaybackTime(target));
+            }, function() {
+                setPlayerStatus('Seek failed');
+            });
+            return;
+        } catch (error) {
+            setPlayerStatus('Seek failed');
+            return;
+        }
+    }
+
+    try {
+        video.currentTime = target / 1000;
+        readHtml5Metrics();
+        setPlayerStatus((deltaMs < 0 ? 'Rewound to ' : 'Skipped to ') + formatPlaybackTime(target));
+    } catch (error2) {
+        setPlayerStatus('Seek failed');
+    }
+}
+
 function hasAvplay() {
     return typeof webapis !== 'undefined' && webapis && webapis.avplay;
 }
@@ -239,10 +377,12 @@ function syncAvplayRect() {
 function clearPlaybackSurface() {
     byId('avplaySurface').classList.remove('is-active');
     byId('videoPlayer').classList.remove('is-hidden');
+    stopPlaybackTicker();
     stopAvplayPlayback();
     stopHtml5Playback();
     state.playerMode = 'html5';
     resetTrackState();
+    resetPlaybackMetrics();
     renderTrackSelectors();
 }
 
@@ -376,7 +516,7 @@ function refreshAvplayTracks() {
             return;
         }
 
-        if (trackInfo.type === 'TEXT') {
+        if (trackInfo.type === 'TEXT' || trackInfo.type === 'SUBTITLE') {
             trackId = 'subtitle-' + trackInfo.index;
             nextSubs.push({
                 id: trackId,
@@ -481,7 +621,11 @@ function selectSubtitleTrack(trackId) {
             }
 
             webapis.avplay.setSilentSubtitle(false);
-            webapis.avplay.setSelectTrack('TEXT', selectedTrack.index);
+            try {
+                webapis.avplay.setSelectTrack('TEXT', selectedTrack.index);
+            } catch (textError) {
+                webapis.avplay.setSelectTrack('SUBTITLE', selectedTrack.index);
+            }
             state.activeSubtitleTrack = trackId;
             renderTrackSelectors();
             setPlayerStatus('Subtitles: ' + selectedTrack.label);
@@ -1251,10 +1395,13 @@ function startHtml5Stream(url) {
     }
 
     setPlayerStatus('Loading (HTML5)');
+    resetPlaybackMetrics();
     playPromise = video.play();
     if (playPromise && typeof playPromise.then === 'function') {
         playPromise.then(function() {
             setPlayerStatus('Playing (HTML5)');
+            readHtml5Metrics();
+            startPlaybackTicker();
             scheduleTrackRefresh();
         }).catch(function(error) {
             setPlayerStatus('Play blocked: ' + error.message);
@@ -1294,9 +1441,14 @@ function startAvplayStream(url) {
             },
             onbufferingcomplete: function() {
                 setPlayerStatus('Ready (AVPlay)');
+                readAvplayMetrics();
                 refreshPlaybackTracks();
             },
+            oncurrentplaytime: function(currentTime) {
+                setPlaybackMetrics(currentTime, state.durationMs);
+            },
             onstreamcompleted: function() {
+                readAvplayMetrics();
                 setPlayerStatus('Finished');
             },
             onerror: function(error) {
@@ -1307,11 +1459,14 @@ function startAvplayStream(url) {
 
         syncAvplayRect();
         setPlayerStatus('Loading (AVPlay)');
+        resetPlaybackMetrics();
         webapis.avplay.prepareAsync(function() {
             syncAvplayRect();
             try {
                 webapis.avplay.play();
                 setPlayerStatus('Playing (AVPlay)');
+                readAvplayMetrics();
+                startPlaybackTicker();
                 scheduleTrackRefresh();
             } catch (playError) {
                 setPlayerStatus('AVPlay play failed');
@@ -1630,8 +1785,16 @@ function bindPlayer() {
         goBackOnce();
     });
 
+    byId('playerSeekBackButton').addEventListener('click', function() {
+        seekCurrentPlayback(-30000);
+    });
+
     byId('playerToggleButton').addEventListener('click', function() {
         toggleCurrentPlayback();
+    });
+
+    byId('playerSeekForwardButton').addEventListener('click', function() {
+        seekCurrentPlayback(30000);
     });
 
     byId('playerReloadButton').addEventListener('click', function() {
@@ -1651,11 +1814,15 @@ function bindPlayer() {
     });
 
     video.addEventListener('loadedmetadata', refreshPlaybackTracks);
+    video.addEventListener('loadedmetadata', readHtml5Metrics);
     video.addEventListener('loadeddata', refreshPlaybackTracks);
+    video.addEventListener('timeupdate', readHtml5Metrics);
     video.addEventListener('durationchange', refreshPlaybackTracks);
+    video.addEventListener('durationchange', readHtml5Metrics);
     video.addEventListener('playing', function() {
         byId('playerToggleButton').textContent = 'Pause';
         setPlayerStatus('Playing');
+        startPlaybackTicker();
         refreshPlaybackTracks();
     });
     video.addEventListener('pause', function() {
@@ -1667,7 +1834,13 @@ function bindPlayer() {
     video.addEventListener('waiting', function() {
         setPlayerStatus('Buffering');
     });
+    video.addEventListener('ended', function() {
+        stopPlaybackTicker();
+        readHtml5Metrics();
+        setPlayerStatus('Finished');
+    });
     video.addEventListener('error', function() {
+        stopPlaybackTicker();
         setPlayerStatus('Playback error');
     });
 
@@ -1675,6 +1848,11 @@ function bindPlayer() {
 }
 
 function handleLeft() {
+    if (state.currentView === 'player' && state.playerFullscreen) {
+        seekCurrentPlayback(-10000);
+        return;
+    }
+
     if (state.focusRegion === 'nav') {
         return;
     }
@@ -1690,6 +1868,11 @@ function handleLeft() {
 }
 
 function handleRight() {
+    if (state.currentView === 'player' && state.playerFullscreen) {
+        seekCurrentPlayback(10000);
+        return;
+    }
+
     if (state.focusRegion === 'nav') {
         state.focusRegion = 'main';
         state.mainRow = 0;
@@ -1703,6 +1886,10 @@ function handleRight() {
 }
 
 function handleUp() {
+    if (state.currentView === 'player' && state.playerFullscreen) {
+        return;
+    }
+
     if (state.focusRegion === 'nav') {
         if (state.navIndex > 0) {
             state.navIndex -= 1;
@@ -1722,6 +1909,10 @@ function handleUp() {
 }
 
 function handleDown() {
+    if (state.currentView === 'player' && state.playerFullscreen) {
+        return;
+    }
+
     if (state.focusRegion === 'nav') {
         if (state.navIndex < NAV_VIEWS.length - 1) {
             state.navIndex += 1;
@@ -1739,6 +1930,11 @@ function handleDown() {
 }
 
 function handleEnter() {
+    if (state.currentView === 'player' && state.playerFullscreen) {
+        toggleCurrentPlayback();
+        return;
+    }
+
     if (!document.activeElement) {
         return;
     }

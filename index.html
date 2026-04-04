@@ -198,8 +198,20 @@
                                     Pick an addon stream to open the player.
                                 </div>
                             </div>
+                            <div class="player-controller-card">
+                                <div class="player-progress-meta">
+                                    <span class="player-time-value" id="playerCurrentTime">00:00</span>
+                                    <div class="player-progress-rail" aria-hidden="true">
+                                        <div class="player-progress-fill" id="playerProgressFill"></div>
+                                    </div>
+                                    <span class="player-time-value" id="playerDuration">00:00</span>
+                                </div>
+                                <div class="player-progress-caption" id="playerProgressCaption">Idle</div>
+                            </div>
                             <div class="action-row" id="playerActions">
+                                <button class="action-button" id="playerSeekBackButton" type="button">-30s</button>
                                 <button class="action-button action-primary" id="playerToggleButton" type="button">Play</button>
+                                <button class="action-button" id="playerSeekForwardButton" type="button">+30s</button>
                                 <button class="action-button" id="playerReloadButton" type="button">Reload</button>
                                 <button class="action-button" id="playerFullscreenButton" type="button">Fullscreen</button>
                                 <button class="action-button" id="playerBackButton" type="button">Back to Addons</button>

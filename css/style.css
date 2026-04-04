@@ -333,6 +333,12 @@ body.is-player-fullscreen .player-layout {
     gap: 12px;
 }
 
+#playerActions {
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+}
+
 .action-button {
     min-width: 160px;
     min-height: 54px;
@@ -618,8 +624,53 @@ body.is-player-fullscreen .video-frame {
     display: none;
 }
 
+body.is-player-fullscreen .player-controller-card,
 body.is-player-fullscreen #playerActions {
     display: none;
+}
+
+.player-controller-card {
+    margin: 16px 0 14px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.player-progress-meta {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 14px;
+}
+
+.player-time-value {
+    min-width: 64px;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.player-progress-rail {
+    position: relative;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.player-progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+}
+
+.player-progress-caption {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 15px;
 }
 
 .player-info-card {
