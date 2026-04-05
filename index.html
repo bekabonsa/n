@@ -9,99 +9,105 @@
     <script src="$WEBAPIS/webapis/webapis.js"></script>
     <script defer src="js/main.js"></script>
 </head>
-<body>
+<body data-current-view="home">
     <div class="app-frame">
-        <aside class="side-panel">
-            <div>
-                <div class="brand-block">
-                    <div class="brand-mark">
-                        <img src="images/stremio-logo.svg" alt="Stremio" class="brand-logo" />
-                    </div>
-                    <div>
-                        <div class="brand-kicker">Connected TV</div>
-                        <div class="brand-title">Stremio</div>
-                    </div>
+        <header class="top-chrome">
+            <div class="top-brand">
+                <div class="brand-mark">
+                    <img src="images/stremio-logo.svg" alt="Stremio" class="brand-logo" />
                 </div>
-
-                <nav class="nav-list" aria-label="Primary navigation">
-                    <button class="nav-item is-active" type="button" data-view="home">Home</button>
-                    <button class="nav-item" type="button" data-view="movies">Movies</button>
-                    <button class="nav-item" type="button" data-view="series">Series</button>
-                    <button class="nav-item" type="button" data-view="search">Search</button>
-                    <button class="nav-item" type="button" data-view="addons">Addons</button>
-                    <button class="nav-item" type="button" data-view="player">Player</button>
-                    <button class="nav-item" type="button" data-view="login">Login</button>
-                </nav>
+                <div class="brand-copy">
+                    <span class="brand-kicker">Connected TV</span>
+                    <span class="brand-title">Stremio</span>
+                </div>
             </div>
 
-            <div class="side-status">
-                <div class="status-card">
-                    <span class="status-label">Connection</span>
-                    <span class="status-pill" id="connectionStatus">Checking...</span>
+            <nav class="nav-list top-nav" aria-label="Primary navigation">
+                <button class="nav-item nav-item-search" type="button" data-view="search">
+                    <span class="nav-icon">⌕</span>
+                    <span class="nav-label">Search</span>
+                </button>
+                <button class="nav-item is-active" type="button" data-view="home">
+                    <span class="nav-label">Home</span>
+                </button>
+                <button class="nav-item" type="button" data-view="series">
+                    <span class="nav-label">Series</span>
+                </button>
+                <button class="nav-item" type="button" data-view="movies">
+                    <span class="nav-label">Films</span>
+                </button>
+                <button class="nav-item" type="button" data-view="login">
+                    <span class="nav-label">My Stremio</span>
+                </button>
+            </nav>
+
+            <div class="utility-cluster">
+                <span class="status-pill" id="connectionStatus">Checking...</span>
+                <span class="status-pill" id="sessionStatus">Signed out</span>
+                <div class="profile-pill">
+                    <span class="top-account-label">Profile</span>
+                    <span class="top-account-value" id="topAccountLabel">Guest</span>
+                    <span class="visually-hidden" id="sideUserLabel">Guest</span>
                 </div>
-                <div class="status-card">
-                    <span class="status-label">Session</span>
-                    <span class="status-pill" id="sessionStatus">Signed out</span>
-                </div>
-                <div class="status-card">
-                    <span class="status-label">Account</span>
-                    <span class="account-mini-value" id="sideUserLabel">Guest</span>
-                </div>
-                <div class="side-hint">Up and down switch sections. Right enters a page. Left returns to the sidebar. OK selects.</div>
             </div>
-        </aside>
+        </header>
 
         <main class="content-shell" id="contentShell">
-            <header class="top-bar">
-                <div>
-                    <div class="page-kicker" id="pageEyebrow">Discover</div>
-                    <h1 class="page-title" id="pageTitle">Home</h1>
-                    <p class="page-subtitle" id="pageSubtitle">Browse live Stremio-backed content in a TV-first shell.</p>
-                </div>
-                <div class="top-account">
-                    <span class="top-account-label">Signed in as</span>
-                    <span class="top-account-value" id="topAccountLabel">Guest</span>
-                </div>
+            <header class="page-header">
+                <div class="page-kicker" id="pageEyebrow">Discover</div>
+                <h1 class="page-title" id="pageTitle">Home</h1>
+                <p class="page-subtitle" id="pageSubtitle">Browse live Stremio-backed content in a TV-first shell.</p>
             </header>
 
             <div class="view-stack">
                 <section class="view view-home is-active" data-view-panel="home">
-                    <section class="featured-panel">
-                        <div class="featured-copy">
-                            <span class="featured-tag" id="featuredTag">Live catalogs</span>
-                            <h2 class="featured-title" id="featuredTitle">Top picks from Cinemeta</h2>
-                            <p class="featured-meta" id="featuredMeta">Use the sidebar to move between pages.</p>
-                            <p class="featured-description" id="featuredDescription">
-                                This shell keeps the working TV project intact while separating login, content,
-                                addons, and player flow into proper views.
-                            </p>
-                            <div class="action-row" id="homeActions">
-                                <button class="action-button action-primary" id="homeLoginButton" type="button">Open Login</button>
-                                <button class="action-button" id="homeMoviesButton" type="button">Browse Movies</button>
-                                <button class="action-button" id="homeSeriesButton" type="button">Browse Series</button>
+                    <section class="hero-banner content-row" id="homeHeroRow">
+                        <div class="featured-poster hero-media" id="featuredPoster">
+                            <div class="hero-overlay"></div>
+                            <div class="hero-copy">
+                                <span class="featured-tag" id="featuredTag">Live catalogs</span>
+                                <h2 class="featured-title" id="featuredTitle">Top picks from Cinemeta</h2>
+                                <p class="featured-meta" id="featuredMeta">Use the top bar to move between pages.</p>
+                                <p class="featured-description" id="featuredDescription">
+                                    This shell keeps the working TV project intact while moving the experience toward a more cinematic browse layout.
+                                </p>
+                                <div class="action-row hero-actions" id="homeActions">
+                                    <button class="action-button action-primary" id="homeLoginButton" type="button">Play</button>
+                                    <button class="action-button" id="homeMoviesButton" type="button">More Info</button>
+                                    <button class="action-button" id="homeSeriesButton" type="button">Search</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="featured-poster" id="featuredPoster">
-                            <div class="featured-poster-label">No artwork</div>
+                            <div class="featured-poster-label">Featured</div>
                         </div>
                     </section>
 
-                    <section class="section-card">
+                    <section class="browse-shelf content-row" id="homeContinueSection">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-kicker">Resume</span>
+                                <h2>Continue Watching</h2>
+                            </div>
+                            <span class="section-count" id="homeContinueCount">0 saved</span>
+                        </div>
+                        <div class="rail rail-continue" id="continueRail"></div>
+                    </section>
+
+                    <section class="browse-shelf content-row" id="homeMoviesSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Trending now</span>
-                                <h2>Movie picks</h2>
+                                <h2>Popular Films</h2>
                             </div>
                             <span class="section-count" id="homeMovieCount">0 loaded</span>
                         </div>
                         <div class="rail" id="homeMovieRail"></div>
                     </section>
 
-                    <section class="section-card">
+                    <section class="browse-shelf content-row" id="homeSeriesSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Binge next</span>
-                                <h2>Series picks</h2>
+                                <h2>Series Spotlight</h2>
                             </div>
                             <span class="section-count" id="homeSeriesCount">0 loaded</span>
                         </div>
@@ -110,27 +116,37 @@
                 </section>
 
                 <section class="view view-movies" data-view-panel="movies">
-                    <section class="section-card section-card-fill">
+                    <section class="browse-shelf browse-shelf-hero content-row" id="movieGenreSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Catalog</span>
-                                <h2>Movies</h2>
+                                <h2>Films</h2>
                             </div>
                             <span class="section-count" id="movieCount">0 loaded</span>
                         </div>
-                        <p class="section-copy">Browse by genre, load more titles, and open a movie directly into addon sources.</p>
-                        <div class="browse-toolbar">
-                            <div class="genre-chip-row" id="movieGenreRow"></div>
-                            <div class="action-row browse-actions">
-                                <button class="action-button" id="movieLoadMoreButton" type="button">Load More Movies</button>
+                        <p class="section-copy">Browse by genre, inspect details, and move directly into addon streams.</p>
+                        <div class="genre-chip-row" id="movieGenreRow"></div>
+                    </section>
+
+                    <section class="browse-shelf content-row" id="movieShelfSection">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-kicker">Now showing</span>
+                                <h2>Featured films</h2>
                             </div>
                         </div>
-                        <div class="rail rail-browse" id="movieGrid"></div>
+                        <div class="card-row-stack" id="movieGrid"></div>
+                    </section>
+
+                    <section class="browse-shelf browse-action-shelf content-row" id="movieLoadSection">
+                        <div class="action-row browse-actions">
+                            <button class="action-button" id="movieLoadMoreButton" type="button">Load More Films</button>
+                        </div>
                     </section>
                 </section>
 
                 <section class="view view-series" data-view-panel="series">
-                    <section class="section-card section-card-fill">
+                    <section class="browse-shelf browse-shelf-hero content-row" id="seriesGenreSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Catalog</span>
@@ -138,19 +154,29 @@
                             </div>
                             <span class="section-count" id="seriesCount">0 loaded</span>
                         </div>
-                        <p class="section-copy">Browse by genre, load more shows, and pick an episode before opening addon streams.</p>
-                        <div class="browse-toolbar">
-                            <div class="genre-chip-row" id="seriesGenreRow"></div>
-                            <div class="action-row browse-actions">
-                                <button class="action-button" id="seriesLoadMoreButton" type="button">Load More Series</button>
+                        <p class="section-copy">Browse by genre, pick a show, then move into seasons, episodes, and addon sources.</p>
+                        <div class="genre-chip-row" id="seriesGenreRow"></div>
+                    </section>
+
+                    <section class="browse-shelf content-row" id="seriesShelfSection">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-kicker">Now showing</span>
+                                <h2>Featured series</h2>
                             </div>
                         </div>
-                        <div class="rail rail-browse" id="seriesGrid"></div>
+                        <div class="card-row-stack" id="seriesGrid"></div>
+                    </section>
+
+                    <section class="browse-shelf browse-action-shelf content-row" id="seriesLoadSection">
+                        <div class="action-row browse-actions">
+                            <button class="action-button" id="seriesLoadMoreButton" type="button">Load More Series</button>
+                        </div>
                     </section>
                 </section>
 
                 <section class="view view-search" data-view-panel="search">
-                    <section class="section-card">
+                    <section class="browse-shelf browse-shelf-hero content-row" id="searchFormSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Discover</span>
@@ -158,15 +184,15 @@
                             </div>
                             <span class="section-count" id="searchResultCount">No results yet</span>
                         </div>
-                        <p class="section-copy">Search Cinemeta for movies and series, then jump straight into addon streams.</p>
+                        <p class="section-copy">Search Cinemeta for films and series, then jump straight into details and streams.</p>
                         <div class="search-toolbar">
                             <label class="field search-field">
                                 <span>Search term</span>
-                                <input id="searchInput" type="text" autocomplete="off" placeholder="Search movies or series" />
+                                <input id="searchInput" type="text" autocomplete="off" placeholder="Search titles" />
                             </label>
                             <div class="search-scope-group" id="searchScopeGroup">
                                 <button class="action-button search-scope is-selected" id="searchScopeAll" type="button">All</button>
-                                <button class="action-button search-scope" id="searchScopeMovies" type="button">Movies</button>
+                                <button class="action-button search-scope" id="searchScopeMovies" type="button">Films</button>
                                 <button class="action-button search-scope" id="searchScopeSeries" type="button">Series</button>
                             </div>
                             <div class="action-row search-actions">
@@ -177,18 +203,18 @@
                         <p class="helper" id="searchMessage">Enter at least 2 characters to search live catalogs.</p>
                     </section>
 
-                    <section class="section-card" id="searchMovieSection">
+                    <section class="browse-shelf content-row" id="searchMovieSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Results</span>
-                                <h2>Movies</h2>
+                                <h2>Films</h2>
                             </div>
                             <span class="section-count" id="searchMovieCount">0 results</span>
                         </div>
-                        <div class="catalog-grid" id="searchMovieGrid"></div>
+                        <div class="card-row-stack" id="searchMovieGrid"></div>
                     </section>
 
-                    <section class="section-card" id="searchSeriesSection">
+                    <section class="browse-shelf content-row" id="searchSeriesSection">
                         <div class="section-header">
                             <div>
                                 <span class="section-kicker">Results</span>
@@ -196,22 +222,21 @@
                             </div>
                             <span class="section-count" id="searchSeriesCount">0 results</span>
                         </div>
-                        <div class="catalog-grid" id="searchSeriesGrid"></div>
+                        <div class="card-row-stack" id="searchSeriesGrid"></div>
                     </section>
                 </section>
 
                 <section class="view view-addons" data-view-panel="addons">
-                    <div class="addons-layout">
-                        <section class="section-card addon-summary-card">
-                            <div class="section-header">
-                                <div>
-                                    <span class="section-kicker">Selection</span>
-                                    <h2 id="selectedTitle">Nothing selected</h2>
-                                </div>
-                                <span class="section-count" id="selectedTypeLabel">Choose a title</span>
-                            </div>
-                            <p class="section-copy" id="selectedDescription">
-                                Pick a movie or show from the catalog pages to inspect addon streams here.
+                    <section class="detail-hero content-row" id="detailHeroRow">
+                        <div class="detail-backdrop" id="detailArtwork">
+                            <div class="detail-art-overlay"></div>
+                        </div>
+                        <div class="detail-copy">
+                            <span class="featured-tag" id="selectedTypeLabel">Choose a title</span>
+                            <h1 class="detail-title" id="selectedTitle">Nothing selected</h1>
+                            <p class="detail-meta" id="selectedVideoLabel">No episode selected</p>
+                            <p class="detail-description" id="selectedDescription">
+                                Pick a movie or show from the browse pages to inspect addon streams here.
                             </p>
                             <div class="info-grid">
                                 <div class="info-tile">
@@ -224,42 +249,47 @@
                                 </div>
                                 <div class="info-tile">
                                     <span class="status-label">Selection</span>
-                                    <span class="info-value" id="selectedVideoLabel">No episode selected</span>
+                                    <span class="info-value" id="selectedTypeSummary">Choose a title</span>
                                 </div>
+                            </div>
+                            <div class="action-row detail-actions" id="detailActions">
+                                <button class="action-button action-primary" id="detailPlayButton" type="button">Play</button>
+                                <button class="action-button" id="detailEpisodesButton" type="button">Episodes</button>
+                                <button class="action-button" id="detailSourcesButton" type="button">Sources</button>
                             </div>
                             <p class="helper" id="addonsMessage">Sign in and choose a title to load addon streams.</p>
-                        </section>
+                        </div>
+                    </section>
 
-                        <section class="section-card" id="seasonSection">
-                            <div class="section-header">
-                                <div>
-                                    <span class="section-kicker">Seasons</span>
-                                    <h2>Choose a season</h2>
-                                </div>
+                    <section class="browse-shelf content-row" id="seasonSection">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-kicker">Seasons</span>
+                                <h2>Choose a season</h2>
                             </div>
-                            <div class="season-rail" id="seasonRail"></div>
-                        </section>
+                        </div>
+                        <div class="season-rail" id="seasonRail"></div>
+                    </section>
 
-                        <section class="section-card" id="episodeSection">
-                            <div class="section-header">
-                                <div>
-                                    <span class="section-kicker">Episodes</span>
-                                    <h2>Choose an episode</h2>
-                                </div>
+                    <section class="browse-shelf content-row" id="episodeSection">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-kicker">Episodes</span>
+                                <h2>Choose an episode</h2>
                             </div>
-                            <div class="episode-rail" id="episodeRail"></div>
-                        </section>
+                        </div>
+                        <div class="episode-rail" id="episodeRail"></div>
+                    </section>
 
-                        <section class="section-card section-card-fill">
-                            <div class="section-header">
-                                <div>
-                                    <span class="section-kicker">Addon streams</span>
-                                    <h2>Available sources</h2>
-                                </div>
+                    <section class="browse-shelf content-row" id="streamSection">
+                        <div class="section-header">
+                            <div>
+                                <span class="section-kicker">Sources</span>
+                                <h2>Available streams</h2>
                             </div>
-                            <div class="stream-list" id="streamList"></div>
-                        </section>
-                    </div>
+                        </div>
+                        <div class="stream-list" id="streamList"></div>
+                    </section>
                 </section>
 
                 <section class="view view-player" data-view-panel="player">
@@ -285,7 +315,7 @@
                                             <span class="player-time-value" id="playerDuration">00:00</span>
                                         </div>
                                         <div class="player-progress-caption" id="playerProgressCaption">Idle</div>
-                                        <div class="action-row" id="playerActions">
+                                        <div class="action-row player-actions" id="playerActions">
                                             <button class="action-button player-icon-button" id="playerSeekBackButton" type="button" aria-label="Back 30 seconds" title="Back 30 seconds">
                                                 <span class="player-action-glyph">↶</span>
                                                 <span class="player-action-badge">30</span>
@@ -317,7 +347,7 @@
                             </div>
                         </section>
 
-                        <section class="section-card player-info-card">
+                        <section class="player-side-card">
                             <div class="section-header">
                                 <div>
                                     <span class="section-kicker">Now playing</span>
@@ -361,7 +391,7 @@
 
                 <section class="view view-login" data-view-panel="login">
                     <div class="account-layout">
-                        <form class="login-card" id="loginForm">
+                        <form class="login-card content-row" id="loginForm">
                             <span class="section-kicker">Account</span>
                             <h2>Sign in to Stremio</h2>
                             <p class="section-copy">Use your real Stremio account to connect the TV shell to your addons and session.</p>
@@ -384,7 +414,7 @@
                             <p class="helper" id="loginMessage">Use your Stremio account here.</p>
                         </form>
 
-                        <section class="account-card">
+                        <section class="account-card content-row">
                             <span class="section-kicker">Session</span>
                             <h2>Current account</h2>
                             <div class="account-stat">

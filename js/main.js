@@ -2,44 +2,45 @@ var API_BASE = 'https://api.strem.io';
 var CINEMETA_BASE = 'https://v3-cinemeta.strem.io';
 var STORAGE_AUTH = 'stremio.authKey';
 var STORAGE_USER = 'stremio.user';
+var STORAGE_CONTINUE = 'stremio.continueWatching';
 var FALLBACK_MOVIE_GENRES = ['Top', 'Action', 'Comedy', 'Drama', 'Sci-Fi', 'Thriller', 'Animation', 'Documentary'];
 var FALLBACK_SERIES_GENRES = ['Top', 'Drama', 'Comedy', 'Crime', 'Sci-Fi', 'Animation', 'Thriller', 'Documentary'];
-var NAV_VIEWS = ['home', 'movies', 'series', 'search', 'addons', 'player', 'login'];
+var NAV_VIEWS = ['search', 'home', 'series', 'movies', 'login'];
 var VIEW_META = {
     home: {
         eyebrow: 'Discover',
         title: 'Home',
-        subtitle: 'Browse live Stremio-backed content in a TV-first shell.'
+        subtitle: 'Featured picks, continue watching, and curated rows shaped for TV browsing.'
     },
     movies: {
         eyebrow: 'Catalog',
-        title: 'Movies',
-        subtitle: 'Pick a movie and move directly into addon streams.'
+        title: 'Films',
+        subtitle: 'Browse cinematic rows, change genres, and drill into sources without leaving the TV flow.'
     },
     series: {
         eyebrow: 'Catalog',
         title: 'Series',
-        subtitle: 'Pick a show, then choose an episode before loading streams.'
+        subtitle: 'Browse shows, then move into seasons, episodes, and installed addon sources.'
     },
     search: {
         eyebrow: 'Discover',
         title: 'Search',
-        subtitle: 'Search live Cinemeta catalogs for movies and series.'
+        subtitle: 'Search live Cinemeta catalogs for films and series.'
     },
     addons: {
-        eyebrow: 'Sources',
-        title: 'Addons',
-        subtitle: 'Installed addons and available streams for the selected title.'
+        eyebrow: 'Details',
+        title: 'Details',
+        subtitle: 'Selection summary, seasons, episodes, and the sources available from your installed addons.'
     },
     player: {
         eyebrow: 'Playback',
         title: 'Player',
-        subtitle: 'A first pass player view for direct stream URLs.'
+        subtitle: 'Native playback with TV overlay controls and direct addon stream support.'
     },
     login: {
         eyebrow: 'Account',
-        title: 'Login',
-        subtitle: 'Connect your Stremio account and restore installed addons.'
+        title: 'My Stremio',
+        subtitle: 'Connect your account, restore your session, and use your installed addons.'
     }
 };
 
@@ -47,6 +48,7 @@ var state = {
     authKey: null,
     user: null,
     addons: [],
+    continueWatching: [],
     movies: [],
     series: [],
     movieGenres: FALLBACK_MOVIE_GENRES.slice(),
@@ -85,11 +87,14 @@ var state = {
     currentView: 'home',
     viewHistory: [],
     focusRegion: 'nav',
-    navIndex: 0,
+    navIndex: 1,
     mainRow: 0,
     mainCol: 0,
     featuredKey: null,
-    featuredTimer: null
+    featuredTimer: null,
+    featuredItem: null,
+    featuredKind: null,
+    autoplayPending: false
 };
 
 function byId(id) {
@@ -187,6 +192,68 @@ function updateUserPanel() {
     byId('accountNote').textContent = state.authKey
         ? 'This Stremio session is stored locally on the TV shell.'
         : 'Sign in to keep your Stremio session active inside this TV shell.';
+}
+
+function cloneContinueItem(item) {
+    if (!item) {
+        return null;
+    }
+
+    return {
+        id: item.id,
+        name: item.name,
+        poster: item.poster,
+        background: item.background || item.poster,
+        description: item.description,
+        releaseInfo: item.releaseInfo,
+        year: item.year,
+        imdbRating: item.imdbRating
+    };
+}
+
+function saveContinueWatching() {
+    localStorage.setItem(STORAGE_CONTINUE, JSON.stringify(state.continueWatching.slice(0, 12)));
+}
+
+function restoreContinueWatching() {
+    var payload = safeJsonParse(localStorage.getItem(STORAGE_CONTINUE));
+
+    if (!Array.isArray(payload)) {
+        state.continueWatching = [];
+        return;
+    }
+
+    state.continueWatching = payload.filter(function(entry) {
+        return entry && entry.item && entry.kind && entry.item.id;
+    }).slice(0, 12);
+}
+
+function trackContinueWatching(item, kind, video) {
+    var snapshot;
+    var key;
+
+    if (!item || !kind) {
+        return;
+    }
+
+    snapshot = {
+        kind: kind,
+        item: cloneContinueItem(item),
+        video: video ? {
+            id: video.id,
+            title: video.title || video.name || '',
+            season: getVideoSeason(video),
+            episode: getVideoEpisode(video)
+        } : null
+    };
+    key = snapshot.kind + ':' + snapshot.item.id + ':' + (snapshot.video && snapshot.video.id ? snapshot.video.id : '');
+
+    state.continueWatching = [snapshot].concat(state.continueWatching.filter(function(entry) {
+        var entryKey = entry.kind + ':' + entry.item.id + ':' + (entry.video && entry.video.id ? entry.video.id : '');
+        return entryKey !== key;
+    })).slice(0, 12);
+
+    saveContinueWatching();
 }
 
 function resetTrackState() {
@@ -1298,14 +1365,25 @@ function setPlayerFullscreen(enabled) {
 
 function updatePageHeader() {
     var meta = VIEW_META[state.currentView];
+    document.body.setAttribute('data-current-view', state.currentView);
     byId('pageEyebrow').textContent = meta.eyebrow;
     byId('pageTitle').textContent = meta.title;
     byId('pageSubtitle').textContent = meta.subtitle;
 }
 
 function updateNavState() {
+    var activeView = state.currentView;
+
+    if (NAV_VIEWS.indexOf(activeView) === -1) {
+        if (state.currentView === 'addons' || state.currentView === 'player') {
+            activeView = state.selectedType === 'series' ? 'series' : 'movies';
+        } else {
+            activeView = 'home';
+        }
+    }
+
     queryAll('.nav-item').forEach(function(item) {
-        item.classList.toggle('is-active', item.getAttribute('data-view') === state.currentView);
+        item.classList.toggle('is-active', item.getAttribute('data-view') === activeView);
     });
 }
 
@@ -1313,6 +1391,7 @@ function updateViewState() {
     queryAll('[data-view-panel]').forEach(function(panel) {
         panel.classList.toggle('is-active', panel.getAttribute('data-view-panel') === state.currentView);
     });
+    updateRowEmphasis();
 }
 
 function chunkItems(items, size) {
@@ -1326,15 +1405,78 @@ function chunkItems(items, size) {
     return rows;
 }
 
+function getMainRowContainers() {
+    if (state.currentView === 'home') {
+        return [
+            byId('homeHeroRow'),
+            byId('homeContinueSection'),
+            byId('homeMoviesSection'),
+            byId('homeSeriesSection')
+        ].filter(function(el) {
+            return el && el.style.display !== 'none';
+        });
+    }
+
+    if (state.currentView === 'movies') {
+        return [
+            byId('movieGenreSection'),
+            byId('movieShelfSection'),
+            byId('movieLoadSection')
+        ].filter(Boolean);
+    }
+
+    if (state.currentView === 'series') {
+        return [
+            byId('seriesGenreSection'),
+            byId('seriesShelfSection'),
+            byId('seriesLoadSection')
+        ].filter(Boolean);
+    }
+
+    if (state.currentView === 'search') {
+        return [
+            byId('searchFormSection'),
+            byId('searchMovieSection'),
+            byId('searchSeriesSection')
+        ].filter(function(el) {
+            return el && el.style.display !== 'none';
+        });
+    }
+
+    if (state.currentView === 'addons') {
+        return [
+            byId('detailHeroRow'),
+            byId('seasonSection'),
+            byId('episodeSection'),
+            byId('streamSection')
+        ].filter(function(el) {
+            return el && el.style.display !== 'none';
+        });
+    }
+
+    if (state.currentView === 'player') {
+        return [
+            queryAll('.player-layout > section')[0],
+            queryAll('.player-layout > section')[1]
+        ].filter(Boolean);
+    }
+
+    return queryAll('.view-login .content-row');
+}
+
 function getMainRows() {
     if (state.currentView === 'home') {
         var homeRows = [];
         var actions = queryAll('#homeActions .action-button');
+        var continueCards = queryAll('#continueRail .card');
         var movieCards = queryAll('#homeMovieRail .card');
         var seriesCards = queryAll('#homeSeriesRail .card');
 
         if (actions.length) {
             homeRows.push(actions);
+        }
+        if (continueCards.length) {
+            homeRows.push(continueCards);
         }
         if (movieCards.length) {
             homeRows.push(movieCards);
@@ -1348,13 +1490,22 @@ function getMainRows() {
     if (state.currentView === 'movies') {
         var movieRows = [];
         var movieGenres = queryAll('#movieGenreRow .genre-chip');
-        var movieCards = queryAll('#movieGrid .card');
+        var movieCardRows = queryAll('#movieGrid .card-row');
 
         if (movieGenres.length) {
             movieRows.push(movieGenres);
         }
-        if (movieCards.length) {
-            movieRows.push(movieCards);
+        movieCardRows.forEach(function(row) {
+            var cards = queryAll('#' + row.id + ' .card');
+            if (cards.length) {
+                movieRows.push(cards);
+            }
+        });
+        if (!movieCardRows.length) {
+            var movieCards = queryAll('#movieGrid .card');
+            if (movieCards.length) {
+                movieRows.push(movieCards);
+            }
         }
         movieRows.push([byId('movieLoadMoreButton')]);
         return movieRows;
@@ -1363,13 +1514,22 @@ function getMainRows() {
     if (state.currentView === 'series') {
         var seriesRows = [];
         var seriesGenres = queryAll('#seriesGenreRow .genre-chip');
-        var seriesCards = queryAll('#seriesGrid .card');
+        var seriesCardRows = queryAll('#seriesGrid .card-row');
 
         if (seriesGenres.length) {
             seriesRows.push(seriesGenres);
         }
-        if (seriesCards.length) {
-            seriesRows.push(seriesCards);
+        seriesCardRows.forEach(function(row) {
+            var cards = queryAll('#' + row.id + ' .card');
+            if (cards.length) {
+                seriesRows.push(cards);
+            }
+        });
+        if (!seriesCardRows.length) {
+            var seriesCards = queryAll('#seriesGrid .card');
+            if (seriesCards.length) {
+                seriesRows.push(seriesCards);
+            }
         }
         seriesRows.push([byId('seriesLoadMoreButton')]);
         return seriesRows;
@@ -1379,8 +1539,8 @@ function getMainRows() {
         var searchRows = [];
         var searchScopeButtons = queryAll('#searchScopeGroup .search-scope');
         var searchActionButtons = queryAll('.search-actions .action-button');
-        var searchMovieCards = state.searchScope === 'series' ? [] : queryAll('#searchMovieGrid .card');
-        var searchSeriesCards = state.searchScope === 'movies' ? [] : queryAll('#searchSeriesGrid .card');
+        var searchMovieRows = state.searchScope === 'series' ? [] : queryAll('#searchMovieGrid .card-row');
+        var searchSeriesRows = state.searchScope === 'movies' ? [] : queryAll('#searchSeriesGrid .card-row');
 
         searchRows.push([byId('searchInput')]);
         if (searchScopeButtons.length) {
@@ -1389,21 +1549,43 @@ function getMainRows() {
         if (searchActionButtons.length) {
             searchRows.push(searchActionButtons);
         }
-        if (searchMovieCards.length) {
-            searchRows = searchRows.concat(chunkItems(searchMovieCards, 4));
+        searchMovieRows.forEach(function(row) {
+            var cards = queryAll('#' + row.id + ' .card');
+            if (cards.length) {
+                searchRows.push(cards);
+            }
+        });
+        searchSeriesRows.forEach(function(row) {
+            var cards = queryAll('#' + row.id + ' .card');
+            if (cards.length) {
+                searchRows.push(cards);
+            }
+        });
+        if (!searchMovieRows.length && state.searchScope !== 'series') {
+            var searchMovieCards = queryAll('#searchMovieGrid .card');
+            if (searchMovieCards.length) {
+                searchRows = searchRows.concat(chunkItems(searchMovieCards, 4));
+            }
         }
-        if (searchSeriesCards.length) {
-            searchRows = searchRows.concat(chunkItems(searchSeriesCards, 4));
+        if (!searchSeriesRows.length && state.searchScope !== 'movies') {
+            var searchSeriesCards = queryAll('#searchSeriesGrid .card');
+            if (searchSeriesCards.length) {
+                searchRows = searchRows.concat(chunkItems(searchSeriesCards, 4));
+            }
         }
         return searchRows;
     }
 
     if (state.currentView === 'addons') {
         var addonRows = [];
+        var detailActions = queryAll('#detailActions .action-button');
         var seasons = queryAll('#seasonRail .season-chip');
         var episodes = queryAll('#episodeRail .episode-chip');
         var streams = queryAll('#streamList .stream-card');
 
+        if (detailActions.length) {
+            addonRows.push(detailActions);
+        }
         if (seasons.length) {
             addonRows.push(seasons);
         }
@@ -1481,6 +1663,7 @@ function scrollElementIntoView(el) {
 
     if (parent && parent.classList && (
         parent.classList.contains('rail') ||
+        parent.classList.contains('nav-list') ||
         parent.classList.contains('season-rail') ||
         parent.classList.contains('episode-rail') ||
         parent.classList.contains('genre-chip-row') ||
@@ -1504,6 +1687,25 @@ function scrollElementIntoView(el) {
     }
 }
 
+function updateRowEmphasis() {
+    var rows = getMainRowContainers();
+    rows.forEach(function(row, index) {
+        row.classList.remove('is-row-current', 'is-row-near', 'is-row-far');
+        if (state.focusRegion !== 'main') {
+            return;
+        }
+        if (index === state.mainRow) {
+            row.classList.add('is-row-current');
+            return;
+        }
+        if (index === state.mainRow + 1 || index === state.mainRow - 1) {
+            row.classList.add('is-row-near');
+            return;
+        }
+        row.classList.add('is-row-far');
+    });
+}
+
 function focusCurrent() {
     if (state.focusRegion === 'nav') {
         var navItems = queryAll('.nav-item');
@@ -1519,6 +1721,7 @@ function focusCurrent() {
         }
 
         navItems[state.navIndex].focus();
+        updateRowEmphasis();
         return;
     }
 
@@ -1533,6 +1736,7 @@ function focusCurrent() {
 
     rows[state.mainRow][state.mainCol].focus();
     scrollElementIntoView(rows[state.mainRow][state.mainCol]);
+    updateRowEmphasis();
     if (state.currentView === 'player' && state.playerFullscreen) {
         showPlayerChrome(state.mainRow > 0);
     }
@@ -1674,6 +1878,8 @@ function updateSelectedEpisodesForSeason() {
 
 function updateFeatured(item, kind) {
     var nextKey;
+    var normalizedKind;
+    var posterUrl;
     if (!item) {
         return;
     }
@@ -1683,10 +1889,13 @@ function updateFeatured(item, kind) {
         return;
     }
     state.featuredKey = nextKey;
+    normalizedKind = kind && kind.toLowerCase().indexOf('series') !== -1 ? 'series' : 'movie';
+    state.featuredItem = item;
+    state.featuredKind = normalizedKind;
 
     var poster = byId('featuredPoster');
     var label = poster.querySelector('.featured-poster-label');
-    var posterUrl = item.poster || '';
+    posterUrl = item.background || item.poster || '';
 
     byId('featuredTag').textContent = kind;
     byId('featuredTitle').textContent = item.name || 'Untitled';
@@ -1847,8 +2056,8 @@ function renderBrowseGenreRows() {
 }
 
 function renderBrowseViews() {
-    renderCards('movieGrid', state.movieBrowseItems, 'movie');
-    renderCards('seriesGrid', state.seriesBrowseItems, 'series');
+    renderCardRows('movieGrid', state.movieBrowseItems, 'movie', 4);
+    renderCardRows('seriesGrid', state.seriesBrowseItems, 'series', 4);
 
     byId('movieCount').textContent = state.movieBrowseItems.length + ' loaded • ' + state.selectedMovieGenre;
     byId('seriesCount').textContent = state.seriesBrowseItems.length + ' loaded • ' + state.selectedSeriesGenre;
@@ -2191,6 +2400,11 @@ function renderSeasonRail() {
 }
 
 function renderAddons() {
+    var detailArtwork = byId('detailArtwork');
+    var selectedTypeSummary = byId('selectedTypeSummary');
+    var detailPlayButton = byId('detailPlayButton');
+    var detailEpisodesButton = byId('detailEpisodesButton');
+
     byId('addonCount').textContent = String(state.addons.length);
     byId('streamCount').textContent = String(state.streams.length);
 
@@ -2199,6 +2413,10 @@ function renderAddons() {
         byId('selectedTypeLabel').textContent = 'Choose a title';
         byId('selectedDescription').textContent = 'Pick a movie or show from the catalog pages to inspect addon streams here.';
         byId('selectedVideoLabel').textContent = 'No episode selected';
+        selectedTypeSummary.textContent = 'Choose a title';
+        detailPlayButton.textContent = 'Play';
+        detailEpisodesButton.textContent = 'Episodes';
+        detailArtwork.style.backgroundImage = 'linear-gradient(180deg, rgba(9, 11, 17, 0.18), rgba(9, 11, 17, 0.42)), #0b0d14';
     } else {
         byId('selectedTitle').textContent = state.selectedItem.name || 'Untitled';
         byId('selectedTypeLabel').textContent = state.selectedType === 'series' ? 'Series' : 'Movie';
@@ -2211,6 +2429,14 @@ function renderAddons() {
                 ? (formatSeasonLabel(getVideoSeason(state.selectedVideo)) + ' • Episode ' + (getVideoEpisode(state.selectedVideo) || '?'))
                 : (state.selectedVideo.title || state.selectedVideo.name || state.selectedVideo.id))
             : (state.selectedType === 'series' ? 'Choose an episode' : 'Movie stream target');
+        selectedTypeSummary.textContent = state.selectedType === 'series'
+            ? (state.selectedItem.releaseInfo || 'Series')
+            : (state.selectedItem.releaseInfo || 'Movie');
+        detailPlayButton.textContent = state.selectedType === 'series' ? 'Play Episode' : 'Play Movie';
+        detailEpisodesButton.textContent = state.selectedType === 'series' ? 'More Episodes' : 'Movie Details';
+        detailArtwork.style.backgroundImage = state.selectedItem.background || state.selectedItem.poster
+            ? 'linear-gradient(180deg, rgba(9, 11, 17, 0.18), rgba(9, 11, 17, 0.42)), url("' + (state.selectedItem.background || state.selectedItem.poster) + '")'
+            : 'linear-gradient(180deg, rgba(9, 11, 17, 0.18), rgba(9, 11, 17, 0.42)), #0b0d14';
     }
 
     renderSeasonRail();
@@ -2472,6 +2698,8 @@ function loadCurrentStream() {
 
 function openStream(streamEntry) {
     state.currentStream = streamEntry;
+    trackContinueWatching(state.selectedItem, state.selectedType, state.selectedVideo);
+    renderContinueWatching();
     renderPlayerState();
     setView('player', {
         focusRegion: 'main',
@@ -2487,17 +2715,16 @@ function openStream(streamEntry) {
 }
 
 function renderCatalogViews() {
-    renderCards('homeMovieRail', state.movies.slice(0, 6), 'movie');
-    renderCards('homeSeriesRail', state.series.slice(0, 6), 'series');
-    renderCards('movieGrid', state.movies, 'movie');
-    renderCards('seriesGrid', state.series, 'series');
+    renderContinueWatching();
+    renderCards('homeMovieRail', state.movies.slice(0, 8), 'movie');
+    renderCards('homeSeriesRail', state.series.slice(0, 8), 'series');
 
-    byId('homeMovieCount').textContent = state.movies.length + ' loaded';
-    byId('homeSeriesCount').textContent = state.series.length + ' loaded';
-    byId('movieCount').textContent = state.movies.length + ' loaded';
-    byId('seriesCount').textContent = state.series.length + ' loaded';
+    byId('homeMovieCount').textContent = state.movies.length + ' ready';
+    byId('homeSeriesCount').textContent = state.series.length + ' ready';
 
-    if (state.movies.length) {
+    if (state.continueWatching.length) {
+        updateFeatured(state.continueWatching[0].item, state.continueWatching[0].kind === 'series' ? 'Series Spotlight' : 'Movie Spotlight');
+    } else if (state.movies.length) {
         updateFeatured(state.movies[0], 'Movie Spotlight');
     } else if (state.series.length) {
         updateFeatured(state.series[0], 'Series Spotlight');
@@ -2515,8 +2742,8 @@ function renderSearchResults() {
     var seriesSection = byId('searchSeriesSection');
     var total = state.searchMovies.length + state.searchSeries.length;
 
-    renderCards('searchMovieGrid', state.searchMovies, 'movie');
-    renderCards('searchSeriesGrid', state.searchSeries, 'series');
+    renderCardRows('searchMovieGrid', state.searchMovies, 'movie', 4);
+    renderCardRows('searchSeriesGrid', state.searchSeries, 'series', 4);
 
     byId('searchMovieCount').textContent = state.searchMovies.length + ' result' + (state.searchMovies.length === 1 ? '' : 's');
     byId('searchSeriesCount').textContent = state.searchSeries.length + ' result' + (state.searchSeries.length === 1 ? '' : 's');
@@ -2632,7 +2859,54 @@ function renderCards(containerId, items, kind) {
     });
 }
 
-function prepareSelection(item, type) {
+function renderCardRows(containerId, items, kind, rowSize) {
+    var container = byId(containerId);
+    var rows = chunkItems(items, rowSize || 4);
+
+    container.innerHTML = '';
+    rows.forEach(function(group, index) {
+        var row = document.createElement('div');
+        row.className = 'card-row';
+        row.id = containerId + 'Row' + index;
+
+        group.forEach(function(item) {
+            row.appendChild(createCard(item, kind));
+        });
+
+        container.appendChild(row);
+    });
+}
+
+function renderContinueWatching() {
+    var container = byId('continueRail');
+    var count = byId('homeContinueCount');
+    var section = byId('homeContinueSection');
+
+    container.innerHTML = '';
+
+    if (!state.continueWatching.length) {
+        count.textContent = 'Nothing saved yet';
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    count.textContent = state.continueWatching.length + ' saved';
+    state.continueWatching.forEach(function(entry) {
+        var card = createCard(entry.item, entry.kind);
+        var meta = card.querySelector('.card-meta');
+
+        if (entry.kind === 'series' && entry.video) {
+            meta.textContent = 'Resume • Season ' + entry.video.season + ' • Episode ' + entry.video.episode;
+        } else {
+            meta.textContent = 'Resume watching';
+        }
+
+        container.appendChild(card);
+    });
+}
+
+function prepareSelection(item, type, options) {
     state.selectedItem = item;
     state.selectedType = type;
     state.allSeriesVideos = [];
@@ -2641,6 +2915,7 @@ function prepareSelection(item, type) {
     state.selectedEpisodes = [];
     state.selectedVideo = null;
     state.streams = [];
+    state.autoplayPending = !!(options && options.autoplayFirst);
     renderAddons();
 
     if (!state.authKey) {
@@ -2730,6 +3005,16 @@ function loadStreamsForSelection() {
 
         if (state.streams.length) {
             setAddonsMessage('Loaded ' + state.streams.length + ' stream entries.', 'success');
+            if (state.autoplayPending) {
+                state.autoplayPending = false;
+                var playable = state.streams.filter(function(entry) {
+                    return entry.playable && entry.raw && entry.raw.url;
+                })[0];
+                if (playable) {
+                    openStream(playable);
+                    return;
+                }
+            }
             setTimeout(focusCurrent, 0);
         } else {
             setAddonsMessage('No stream entries were returned.', 'error');
@@ -2742,7 +3027,8 @@ function bindNav() {
         item.addEventListener('click', function() {
             setView(item.getAttribute('data-view'), {
                 focusRegion: 'main',
-                resetMain: true
+                resetMain: true,
+                pushHistory: false
             });
             setTimeout(focusCurrent, 0);
         });
@@ -2751,27 +3037,71 @@ function bindNav() {
 
 function bindHomeActions() {
     byId('homeLoginButton').addEventListener('click', function() {
-        setView('login', {
-            focusRegion: 'main',
-            resetMain: true
+        if (!state.featuredItem || !state.featuredKind) {
+            return;
+        }
+        prepareSelection(state.featuredItem, state.featuredKind, {
+            autoplayFirst: true
         });
-        setTimeout(focusCurrent, 0);
     });
 
     byId('homeMoviesButton').addEventListener('click', function() {
-        setView('movies', {
+        if (!state.featuredItem || !state.featuredKind) {
+            return;
+        }
+        prepareSelection(state.featuredItem, state.featuredKind);
+    });
+
+    byId('homeSeriesButton').addEventListener('click', function() {
+        setView('search', {
             focusRegion: 'main',
             resetMain: true
         });
         setTimeout(focusCurrent, 0);
     });
+}
 
-    byId('homeSeriesButton').addEventListener('click', function() {
-        setView('series', {
-            focusRegion: 'main',
-            resetMain: true
-        });
-        setTimeout(focusCurrent, 0);
+function bindDetailActions() {
+    byId('detailPlayButton').addEventListener('click', function() {
+        var playable = state.streams.filter(function(entry) {
+            return entry.playable && entry.raw && entry.raw.url;
+        })[0];
+
+        if (playable) {
+            openStream(playable);
+            return;
+        }
+
+        if (state.selectedItem && state.selectedType && state.selectedVideo) {
+            state.autoplayPending = true;
+            loadStreamsForSelection();
+            return;
+        }
+
+        setAddonsMessage('Choose a title first.', 'error');
+    });
+
+    byId('detailEpisodesButton').addEventListener('click', function() {
+        if (state.selectedType === 'series') {
+            state.focusRegion = 'main';
+            state.mainRow = state.availableSeasons.length > 1 ? 1 : 2;
+            state.mainCol = 0;
+            focusCurrent();
+            return;
+        }
+        state.focusRegion = 'main';
+        state.mainRow = 0;
+        state.mainCol = 0;
+        focusCurrent();
+    });
+
+    byId('detailSourcesButton').addEventListener('click', function() {
+        state.focusRegion = 'main';
+        state.mainRow = state.selectedType === 'series'
+            ? (state.availableSeasons.length > 1 ? 3 : 2)
+            : 1;
+        state.mainCol = 0;
+        focusCurrent();
     });
 }
 
@@ -2949,6 +3279,15 @@ function handleLeft() {
     }
 
     if (state.focusRegion === 'nav') {
+        if (state.navIndex > 0) {
+            state.navIndex -= 1;
+            setView(NAV_VIEWS[state.navIndex], {
+                focusRegion: 'nav',
+                resetMain: true,
+                pushHistory: false
+            });
+            focusCurrent();
+        }
         return;
     }
 
@@ -2977,10 +3316,16 @@ function handleRight() {
     }
 
     if (state.focusRegion === 'nav') {
-        state.focusRegion = 'main';
-        state.mainRow = 0;
-        state.mainCol = 0;
-        focusCurrent();
+        if (state.navIndex < NAV_VIEWS.length - 1) {
+            state.navIndex += 1;
+            setView(NAV_VIEWS[state.navIndex], {
+                focusRegion: 'nav',
+                resetMain: true,
+                pushHistory: false
+            });
+            focusCurrent();
+            return;
+        }
         return;
     }
 
@@ -2998,21 +3343,17 @@ function handleUp() {
     }
 
     if (state.focusRegion === 'nav') {
-        if (state.navIndex > 0) {
-            state.navIndex -= 1;
-            setView(NAV_VIEWS[state.navIndex], {
-                focusRegion: 'nav',
-                resetMain: true
-            });
-            focusCurrent();
-        }
         return;
     }
 
     if (state.mainRow > 0) {
         state.mainRow -= 1;
         focusCurrent();
+        return;
     }
+
+    state.focusRegion = 'nav';
+    focusCurrent();
 }
 
 function handleDown() {
@@ -3024,14 +3365,10 @@ function handleDown() {
     }
 
     if (state.focusRegion === 'nav') {
-        if (state.navIndex < NAV_VIEWS.length - 1) {
-            state.navIndex += 1;
-            setView(NAV_VIEWS[state.navIndex], {
-                focusRegion: 'nav',
-                resetMain: true
-            });
-            focusCurrent();
-        }
+        state.focusRegion = 'main';
+        state.mainRow = 0;
+        state.mainCol = 0;
+        focusCurrent();
         return;
     }
 
@@ -3099,18 +3436,21 @@ function init() {
 
     bindNav();
     bindHomeActions();
+    bindDetailActions();
     bindSearch();
     bindBrowse();
     bindLogin();
     bindPlayer();
 
     restoreStoredSession();
+    restoreContinueWatching();
     updateUserPanel();
     updateNavState();
     updateViewState();
     updatePageHeader();
     updateSearchScopeUi();
     renderSearchResults();
+    renderContinueWatching();
     renderAddons();
     renderPlayerState();
 
