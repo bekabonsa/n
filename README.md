@@ -40,13 +40,15 @@ node --check js/main.js
 Build the web app:
 
 ```sh
-"/Users/bekabonsa/tizen-studio/tools/ide/bin/tizen" build-web -- "$(pwd)"
+"/Users/user/tizen-studio/tools/ide/bin/tizen" build-web -- "$(pwd)"
 ```
 
 Package the widget:
 
+replace cert in the following command with your certificate
+
 ```sh
-"/Users/bekabonsa/tizen-studio/tools/ide/bin/tizen" package -t wgt -s bex -- ./.buildResult
+"/Users/user/tizen-studio/tools/ide/bin/tizen" package -t wgt -s cert -- ./.buildResult
 ```
 
 Copy the packaged widget to the repo root:
