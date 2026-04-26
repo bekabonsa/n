@@ -2809,8 +2809,8 @@ function buildContinueEntries() {
             kind: entry.kind,
             video: entry.video,
             metaText: entry.kind === 'series' && entry.video
-                ? 'Resume • Season ' + entry.video.season + ' • Episode ' + entry.video.episode
-                : 'Resume watching'
+                ? '• S' + entry.video.season + ' • Episode ' + entry.video.episode
+                : 'watching'
         };
     });
 }
@@ -3040,7 +3040,7 @@ function syncHomeRailContinuousPosition(descriptor, position) {
         delta = getShortestCircularDelta(entryIndex, normalized, total);
         absDelta = Math.abs(delta);
         metrics = getHomeRailSlotMetrics(centerSlot + delta, centerSlot);
-        metrics.width = Math.max(78, 330 - (absDelta * 34));
+        metrics.width = Math.max(66, 250 - (absDelta * 28));
         if (absDelta > centerSlot + 1.25) {
             metrics.opacity = 0;
         }
@@ -6230,7 +6230,7 @@ function getHomeRailSlotMetrics(slotIndex, centerIndex) {
         offset: offset,
         distance: distance,
         x: x,
-        width: Math.max(78, 330 - (distance * 34)),
+        width: Math.max(66, 250 - (distance * 28)),
         scale: Math.max(0.32, 1 - (distance * 0.13)),
         depth: depth,
         rotate: angle * -62,

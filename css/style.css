@@ -1886,7 +1886,7 @@ input:focus {
     padding: 6px 0 4px;
     --rail-drag-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='4' y='8' width='24' height='16' rx='8' fill='%23080a10' fill-opacity='.92' stroke='%23ffffff' stroke-opacity='.72'/%3E%3Cpath d='M11 16h10M11 16l3-3M11 16l3 3M21 16l-3-3M21 16l-3 3' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 16 16, ew-resize;
     --rail-dragging-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect x='3' y='7' width='26' height='18' rx='9' fill='%23ffffff' fill-opacity='.94' stroke='%23080a10' stroke-opacity='.65'/%3E%3Cpath d='M10 16h12M10 16l4-4M10 16l4 4M22 16l-4-4M22 16l-4 4' stroke='%23080a10' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 16 16, ew-resize;
-    perspective: 2000px;
+    perspective: 1000000px;
     perspective-origin: 50% 42%;
     transform-style: preserve-3d;
     cursor: var(--rail-drag-cursor);
@@ -1947,24 +1947,17 @@ input:focus {
 }
 
 .rail-home-window .card.card-home-feature-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1.22fr) minmax(250px, 0.5fr);
-    grid-template-areas:
-        "title poster"
-        "meta poster"
-        "synopsis poster";
-    column-gap: 30px;
-    align-items: end;
-    min-height: clamp(390px, 31vw, 560px);
-    padding: 34px 42px;
-    border-radius: 24px;
-    overflow: hidden;
-    isolation: isolate;
-    background:
-        radial-gradient(circle at 72% 42%, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 34%),
-        #0b0d14;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 24px 58px rgba(0, 0, 0, 0.36);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0;
+    overflow: visible;
+    isolation: auto;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
 }
 
 .rail-home-window .card.card-home-feature-layout::before {
@@ -2003,6 +1996,12 @@ input:focus {
     pointer-events: none;
 }
 
+.rail-home-window .card.card-home-feature-layout .card-ambient-art,
+.rail-home-window .card.card-home-feature-layout::before,
+.rail-home-window .card.card-home-feature-layout::after {
+    display: none;
+}
+
 .rail-home-window .card.is-home-compact {
     min-width: 0;
     transform-origin: center center;
@@ -2017,17 +2016,14 @@ input:focus {
 }
 
 .rail-home-window .card.is-home-active .poster {
-    grid-area: poster;
     position: relative;
     z-index: 3;
     aspect-ratio: 2 / 3;
-    align-self: center;
-    justify-self: end;
-    width: min(100%, 330px);
+    width: 100%;
     height: auto;
     min-height: 0;
-    border-radius: 20px;
-    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.34);
+    border-radius: 16px;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
 }
 
 .rail-home-window .card.card-home-feature-layout .poster {
@@ -2049,11 +2045,12 @@ input:focus {
     width: 76px;
     height: 76px;
     border-radius: 999px;
-    opacity: 0.86;
-    border: 1px solid rgba(255, 255, 255, 0.28);
+
+    opacity: 0.34;
+    border: 1px solid rgba(255, 255, 255, 0.24);
     background:
-        radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08) 36%, rgba(255, 255, 255, 0.02) 68%),
-        rgba(255, 255, 255, 0.08);
+        radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.07) 36%, rgba(255, 255, 255, 0.02) 68%),
+        rgba(255, 255, 255, 0.06);
     box-shadow:
         0 18px 36px rgba(0, 0, 0, 0.28),
         inset 0 0 0 1px rgba(255, 255, 255, 0.12);
@@ -2061,7 +2058,7 @@ input:focus {
     -webkit-backdrop-filter: blur(10px) saturate(1.2);
     pointer-events: none;
     transform: translate(-50%, -50%);
-    transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+    transition: opacity 140ms ease, transform 140ms ease, background 140ms ease, border-color 140ms ease;
 }
 
 .rail-home-window .card.is-home-active .poster::after {
@@ -2074,17 +2071,17 @@ input:focus {
     height: 0;
     border-top: 14px solid transparent;
     border-bottom: 14px solid transparent;
-    opacity: 0.98;
+    opacity: 0.62;
     border-left: 22px solid rgba(255, 255, 255, 0.88);
     filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.28));
     pointer-events: none;
     transform: translate(-50%, -50%);
-    transition: transform 140ms ease;
+    transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .rail-home-window .card.is-home-active:hover .poster::before,
 .rail-home-window .card.is-home-active:focus .poster::before {
-    opacity: 0.16;
+    opacity: 0.92;
     border-color: rgba(255, 255, 255, 0.42);
     background:
         radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.12) 36%, rgba(255, 255, 255, 0.03) 68%),
@@ -2094,7 +2091,7 @@ input:focus {
 
 .rail-home-window .card.is-home-active:hover .poster::after,
 .rail-home-window .card.is-home-active:focus .poster::after {
-    opacity: 0.48;
+    opacity: 0.96;
     transform: translate(-50%, -50%) scale(1.06);
 }
 
@@ -2109,56 +2106,48 @@ input:focus {
 }
 
 .rail-home-window .card.is-home-active .card-title {
-    position: relative;
-    z-index: 4;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    width: auto;
-    max-height: none;
-    margin: 0;
-    color: #fff;
-    font-size: clamp(36px, 3.4vw, 64px);
-    line-height: 1.04;
-    text-wrap: balance;
-    -webkit-line-clamp: 3;
-    text-shadow: 0 3px 18px rgba(0, 0, 0, 0.74);
+    display: none;
 }
 
 .rail-home-window .card .card-title {
-    height: auto;
-    min-height: 32px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    display: none;
 }
 
 .rail-home-window .card.is-home-active .card-meta {
     position: relative;
     z-index: 4;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    width: auto;
+    display: block;
+    width: min(360px, calc(100vw - 72px));
     min-height: 0;
-    margin: 0;
-    font-size: 18px;
-    color: rgba(235, 240, 250, 0.92);
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.64);
+    margin: 10px 0 0 50%;
+    color: rgba(235, 240, 250, 0.86);
+    font-size: 13px;
+    line-height: 1.25;
+    text-align: center;
+    overflow: visible;
+    white-space: normal;
+    transform: translateX(-50%);
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: initial;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.58);
 }
 
 .rail-home-window .card .card-meta {
     height: auto;
-    min-height: 22px;
+    min-height: 18px;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    margin-top: 8px;
+    color: rgba(235, 240, 250, 0.72);
+    font-size: 11px;
+    line-height: 1.2;
+    text-align: center;
+    -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
 .rail-home-window .card.is-home-compact .card-meta {
-    height: 24px;
+    display: none;
 }
 
 .rail-home-window .card .card-synopsis {
@@ -2175,34 +2164,25 @@ input:focus {
 .rail-home-window .card.is-home-active .card-synopsis {
     position: relative;
     z-index: 4;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    width: auto;
-    max-height: 98px;
+    display: block;
+    width: min(360px, calc(100vw - 72px));
+    max-height: none;
     opacity: 1;
-    margin: 0;
-    font-size: 17px;
-    line-height: 1.42;
-    -webkit-line-clamp: 2;
-    color: rgba(245, 247, 251, 0.9);
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.68);
+    margin: 6px 0 0 50%;
+    font-size: 14px;
+    line-height: 1.34;
+    color: rgba(245, 247, 251, 0.72);
+    text-align: center;
+    overflow: visible;
+    white-space: normal;
+    transform: translateX(-50%);
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: initial;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.58);
 }
 
 .rail-home-window .card.is-home-compact .card-synopsis {
-    visibility: hidden;
-}
-
-.rail-home-window .card.is-home-compact .card-title {
     display: none;
-    height: 0;
-    font-size: 15px;
-    line-height: 1.14;
-}
-
-.rail-home-window .card.is-home-compact .card-meta {
-    display: none;
-    font-size: 12px;
 }
 
 .rail-home-window .card:focus,
@@ -2545,23 +2525,16 @@ input:focus {
     }
 
     .rail-home-window .card.card-home-feature-layout {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-            "title"
-            "meta"
-            "poster"
-            "synopsis";
-        min-height: 520px;
-        padding: 24px;
+        min-height: 0;
+        padding: 0;
     }
 
     .rail-home-window .card.is-home-active .card-title {
-        font-size: clamp(28px, 5vw, 42px);
+        display: none;
     }
 
     .rail-home-window .card.is-home-active .poster {
-        justify-self: center;
-        width: min(100%, 280px);
+        width: 100%;
     }
 
     .card-row .card {
