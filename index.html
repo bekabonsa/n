@@ -178,26 +178,14 @@
                         <div class="search-panel-left">
                             <section class="search-input-card">
                                 <label class="field search-field">
-                                    <span>Search</span>
-                                    <input id="searchTextInput" type="search" autocomplete="off" placeholder="Type a title, genre, or keyword" />
+                                    <span class="search-input-shell">
+                                        <input id="searchTextInput" type="search" autocomplete="off" placeholder="Type a title, genre, or keyword" />
+                                        <svg class="search-input-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle cx="11" cy="11" r="6.5"></circle>
+                                            <path d="M16.2 16.2L21 21"></path>
+                                        </svg>
+                                    </span>
                                 </label>
-                                <div class="search-query-line">
-                                    <svg class="search-query-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                        <circle cx="11" cy="11" r="6.5"></circle>
-                                        <path d="M16.2 16.2L21 21"></path>
-                                    </svg>
-                                    <span class="search-query-text" id="searchDisplayValue">Search titles</span>
-                                </div>
-                                <p class="helper search-helper" id="searchMessage">Type in the desktop search box to search linked addon catalogs.</p>
-                            </section>
-
-                            <section class="search-suggestions-card">
-                                <div class="section-header">
-                                    <div>
-                                        <span class="section-kicker">Suggestions</span>
-                                        <h2>Quick picks</h2>
-                                    </div>
-                                </div>
                                 <div class="search-suggestion-list" id="searchSuggestionList"></div>
                             </section>
                         </div>
@@ -212,9 +200,6 @@
                                     <span class="section-count" id="searchResultCount">No results yet</span>
                                 </div>
                                 <div class="search-results-grid" id="searchResultGrid"></div>
-                                <div class="search-empty-state" id="searchEmptyState">
-                                    Type in the desktop search box to see live movie and series results from your linked catalogs.
-                                </div>
                             </section>
                         </div>
                     </section>
@@ -340,6 +325,13 @@
                                                 <span class="player-action-glyph">&#8631;</span>
                                                 <span class="player-action-badge">30</span>
                                             </button>
+                                            <div class="player-volume-control" id="playerVolumeControl">
+                                                <button class="action-button player-icon-button player-volume-button" id="playerMuteButton" type="button" aria-label="Mute" title="Mute">
+                                                    <span class="player-action-glyph" id="playerVolumeGlyph">&#128266;</span>
+                                                </button>
+                                                <input class="player-volume-slider" id="playerVolumeSlider" type="range" min="0" max="100" step="1" value="100" aria-label="Volume" title="Volume" />
+                                                <span class="player-volume-value" id="playerVolumeValue">100</span>
+                                            </div>
                                             <button class="action-button player-icon-button" id="playerNextEpisodeButton" type="button" aria-label="Play next episode" title="Play next episode">
                                                 <span class="player-action-glyph">&#9197;</span>
                                             </button>

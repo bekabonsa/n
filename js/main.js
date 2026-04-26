@@ -12,6 +12,8 @@ var LEGACY_STORAGE_CONTINUE = 'nuviotizen.continueWatching';
 var STORAGE_WATCHED = 'nuviowebpc.watchedVideos';
 var STORAGE_STREAMING_SERVER = 'nuviowebpc.streamingServerUrl';
 var STORAGE_TRANSCODER_QUALITY = 'nuviowebpc.transcoderQuality';
+var STORAGE_PLAYER_VOLUME = 'nuviowebpc.playerVolume';
+var STORAGE_PLAYER_MUTED = 'nuviowebpc.playerMuted';
 var APP_DEVICE_NAME = 'Nuvio Web PC';
 var FALLBACK_MOVIE_GENRES = ['Top', 'Action', 'Comedy', 'Drama', 'Sci-Fi', 'Thriller', 'Animation', 'Documentary'];
 var FALLBACK_SERIES_GENRES = ['Top', 'Drama', 'Comedy', 'Crime', 'Sci-Fi', 'Animation', 'Thriller', 'Documentary'];
@@ -20,13 +22,14 @@ var FEATURED_ROTATION_MS = 9000;
 var FEATURED_FADE_MS = 180;
 var HOME_CATALOG_LIMIT = 120;
 var HOME_CATALOG_PAGE_SIZE = 24;
-var HOME_RAIL_VISIBLE_DEFAULT = 7;
-var HOME_RAIL_HOVER_COOLDOWN_MS = 650;
-var HOME_RAIL_AUTO_ROTATE_MS = 6500;
+var HOME_RAIL_VISIBLE_DEFAULT = 11;
+var HOME_RAIL_DRAG_STEP_PX = 42;
+var HOME_RAIL_MAX_MOMENTUM_VELOCITY = 0.0018;
+var HOME_RAIL_MOMENTUM_MS = 3000;
 var PLAYER_SCRUB_INITIAL_NUDGE_MS = 5000;
 var PLAYER_SCRUB_TICK_MS = 50;
-var DEFAULT_STREAMING_SERVER_URL = 'https://local.strem.io:12470';
 var NUVIO_STREAMING_SERVER_URL = 'http://127.0.0.1:17870';
+var DEFAULT_STREAMING_SERVER_URL = NUVIO_STREAMING_SERVER_URL;
 var VIEW_META = {
     home: {
         eyebrow: 'Discover',
@@ -123,6 +126,8 @@ var state = {
     seekPreviewLastTickAt: 0,
     seekPreviewTimer: null,
     progressDragActive: false,
+    playerVolume: 1,
+    playerMuted: false,
     hlsPlayer: null,
     html5FallbackUrl: '',
     playerMode: 'html5',
@@ -144,11 +149,11 @@ var state = {
     featuredRenderedKey: null,
     featuredTransitionToken: 0,
     featuredTransitionTimer: null,
-    homeRailAutoTimer: null,
-    homeRailHoverLockUntil: 0,
-    homeRailHoverX: null,
-    homeRailHoverY: null,
     homeRailPointerActiveUntil: 0,
+    homeRailDrag: null,
+    homeRailMomentumFrame: null,
+    homeRailMomentumStopAt: 0,
+    homeRailSuppressClickUntil: 0,
     autoplayPending: false,
     qrAuthAccessToken: null,
     qrAuthRefreshToken: null,
@@ -162,6 +167,10 @@ var state = {
     qrStarting: false,
     homeRailIndices: {
         continue: 0,
+        movies: 0,
+        series: 0
+    },
+    homeRailPositions: {
         movies: 0,
         series: 0
     }
@@ -909,6 +918,10 @@ function updateSubtitleOverlay(currentTimeMs) {
     var textNode;
     var cue = null;
 
+    if (!overlay) {
+        return;
+    }
+
     if (isExternalSubtitleTrackId(state.activeSubtitleTrack) && state.externalSubtitleCues.length) {
         state.externalSubtitleCues.some(function(entry) {
             if (currentTimeMs >= entry.start && currentTimeMs <= entry.end) {
@@ -1233,6 +1246,108 @@ function setPlayerFullscreenUi() {
     byId('playerFullscreenGlyph').textContent = '\u26F6';
     button.setAttribute('aria-label', state.playerFullscreen ? 'Exit fullscreen' : 'Fullscreen');
     button.setAttribute('title', state.playerFullscreen ? 'Exit fullscreen' : 'Fullscreen');
+}
+
+function clampPlayerVolume(value) {
+    value = parseFloat(value);
+    if (!isFinite(value)) {
+        return 1;
+    }
+    return Math.max(0, Math.min(1, value));
+}
+
+function restorePlayerVolume() {
+    var storedVolume = '';
+    var storedMuted = '';
+
+    try {
+        storedVolume = localStorage.getItem(STORAGE_PLAYER_VOLUME) || '';
+        storedMuted = localStorage.getItem(STORAGE_PLAYER_MUTED) || '';
+    } catch (error) {
+        storedVolume = '';
+        storedMuted = '';
+    }
+
+    if (storedVolume !== '') {
+        state.playerVolume = clampPlayerVolume(storedVolume);
+    }
+    state.playerMuted = storedMuted === 'true';
+    applyPlayerVolume(false);
+}
+
+function persistPlayerVolume() {
+    try {
+        localStorage.setItem(STORAGE_PLAYER_VOLUME, String(state.playerVolume));
+        localStorage.setItem(STORAGE_PLAYER_MUTED, state.playerMuted ? 'true' : 'false');
+    } catch (error) {
+        // no-op
+    }
+}
+
+function updatePlayerVolumeUi() {
+    var slider = byId('playerVolumeSlider');
+    var value = byId('playerVolumeValue');
+    var glyph = byId('playerVolumeGlyph');
+    var muteButton = byId('playerMuteButton');
+    var percent = Math.round(state.playerVolume * 100);
+    var muted = state.playerMuted || state.playerVolume <= 0;
+
+    if (slider) {
+        slider.value = String(percent);
+        slider.style.setProperty('--player-volume-percent', percent + '%');
+    }
+    if (value) {
+        value.textContent = muted ? 'Mute' : String(percent);
+    }
+    if (glyph) {
+        glyph.innerHTML = muted ? '&#128263;' : (percent < 50 ? '&#128265;' : '&#128266;');
+    }
+    if (muteButton) {
+        muteButton.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+        muteButton.setAttribute('title', muted ? 'Unmute' : 'Mute');
+    }
+}
+
+function applyPlayerVolume(shouldPersist) {
+    var video = byId('videoPlayer');
+    var level = Math.round((state.playerMuted ? 0 : state.playerVolume) * 100);
+
+    if (video) {
+        video.volume = state.playerVolume;
+        video.muted = state.playerMuted || state.playerVolume <= 0;
+        video.defaultMuted = video.muted;
+    }
+
+    if (state.playerMode === 'avplay' && hasAvplay()) {
+        try {
+            webapis.avplay.setVolume(level, level);
+        } catch (error) {
+            // no-op
+        }
+    }
+
+    updatePlayerVolumeUi();
+    if (shouldPersist) {
+        persistPlayerVolume();
+    }
+}
+
+function setPlayerVolume(value) {
+    state.playerVolume = clampPlayerVolume(value);
+    state.playerMuted = state.playerVolume <= 0;
+    applyPlayerVolume(true);
+}
+
+function togglePlayerMute() {
+    if (state.playerMuted || state.playerVolume <= 0) {
+        if (state.playerVolume <= 0) {
+            state.playerVolume = 0.5;
+        }
+        state.playerMuted = false;
+    } else {
+        state.playerMuted = true;
+    }
+    applyPlayerVolume(true);
 }
 
 function updateTrackBadges() {
@@ -1707,7 +1822,8 @@ function getStreamingServerUrl() {
         stored = '';
     }
 
-    if (/^https?:\/\/(127\.0\.0\.1|localhost):11470/i.test(stored)) {
+    if (/^https?:\/\/(127\.0\.0\.1|localhost):11470/i.test(stored)
+            || /^https:\/\/local\.strem\.io:12470/i.test(stored)) {
         stored = '';
         try {
             localStorage.removeItem(STORAGE_STREAMING_SERVER);
@@ -1757,6 +1873,18 @@ function getHtml5PlaybackUrl(url) {
 
 function getCorsSafeStreamingUrl(url) {
     return buildStreamingServerHlsUrl(url, state.currentStream, DEFAULT_STREAMING_SERVER_URL, state.pendingSeekMs || 0);
+}
+
+function buildLocalJsonProxyUrl(url) {
+    return NUVIO_STREAMING_SERVER_URL + '/proxy-json?url=' + encodeURIComponent(url);
+}
+
+function requestAddonJson(url) {
+    return requestJson(buildLocalJsonProxyUrl(url), 'GET').catch(function(proxyError) {
+        return requestJson(url, 'GET').catch(function() {
+            throw proxyError;
+        });
+    });
 }
 
 function stopHtml5Playback() {
@@ -1842,8 +1970,15 @@ function syncAvplayRect() {
 }
 
 function clearPlaybackSurface() {
-    byId('avplaySurface').classList.remove('is-active');
-    byId('videoPlayer').classList.remove('is-hidden');
+    var surface = byId('avplaySurface');
+    var video = byId('videoPlayer');
+
+    if (surface) {
+        surface.classList.remove('is-active');
+    }
+    if (video) {
+        video.classList.remove('is-hidden');
+    }
     stopPlaybackTicker();
     stopAvplayPlayback();
     stopHtml5Playback();
@@ -2630,8 +2765,8 @@ function getMainRows() {
     if (state.currentView === 'player') {
         var playerRows = [];
         var progressButton = byId('playerProgressButton');
-        var playerActions = queryAll('#playerActions .action-button').filter(function(button) {
-            return !button.disabled;
+        var playerActions = queryAll('#playerActions button, #playerActions input').filter(function(control) {
+            return !control.disabled;
         });
         var audioButtons = queryAll('#audioTrackList .track-chip');
         var subtitleButtons = queryAll('#subtitleTrackList .track-chip');
@@ -2783,71 +2918,239 @@ function activatePointerNavElement(element) {
     return true;
 }
 
-function activateHomeRailHover(card) {
-    var event = arguments[1] || {};
-    var key = card.getAttribute('data-home-rail-key');
-    var entryIndex = parseInt(card.getAttribute('data-home-entry-index'), 10);
-    var descriptor;
+function stopHomeRailMomentum() {
+    if (state.homeRailMomentumFrame) {
+        cancelAnimationFrame(state.homeRailMomentumFrame);
+        state.homeRailMomentumFrame = null;
+    }
+    state.homeRailMomentumStopAt = 0;
+}
+
+function stepHomeRail(descriptor, step) {
     var previousIndex;
     var direction;
-    var now = Date.now();
-    var movedEnough = true;
 
-    if (!key || isNaN(entryIndex)) {
+    if (!descriptor || !descriptor.entries.length || !step) {
         return false;
     }
 
-    descriptor = getHomeRailDescriptorByKey(key);
-    if (!descriptor || !descriptor.entries.length) {
-        return false;
+    stopHomeRailMomentum();
+    previousIndex = state.homeRailIndices[descriptor.key] || 0;
+    direction = step > 0 ? 'right' : 'left';
+    state.homeRailIndices[descriptor.key] = (previousIndex + step + descriptor.entries.length) % descriptor.entries.length;
+    if (state.homeRailPositions[descriptor.key] !== undefined) {
+        state.homeRailPositions[descriptor.key] = state.homeRailIndices[descriptor.key];
     }
-
-    state.homeRailPointerActiveUntil = now + 4200;
-    previousIndex = state.homeRailIndices[key] || 0;
-    if (previousIndex !== entryIndex) {
-        if (typeof event.clientX === 'number' && typeof event.clientY === 'number') {
-            movedEnough = state.homeRailHoverX === null
-                || Math.abs(event.clientX - state.homeRailHoverX) > 10
-                || Math.abs(event.clientY - state.homeRailHoverY) > 10;
-            state.homeRailHoverX = event.clientX;
-            state.homeRailHoverY = event.clientY;
-        }
-        if (!movedEnough || now < state.homeRailHoverLockUntil) {
-            return true;
-        }
-        state.homeRailHoverLockUntil = now + HOME_RAIL_HOVER_COOLDOWN_MS;
-        direction = entryIndex > previousIndex ? 'right' : 'left';
-        state.homeRailIndices[key] = entryIndex;
-        renderSingleHomeRail(descriptor, direction);
-    }
-
-    activatePointerMainElement((byId(descriptor.containerId) && byId(descriptor.containerId).querySelector('.card.is-home-active')) || card);
+    renderSingleHomeRail(descriptor, direction, previousIndex);
     return true;
 }
 
-function rotateHomeRail(descriptor) {
+function normalizeHomeRailPosition(position, total) {
+    if (!total) {
+        return 0;
+    }
+
+    return ((position % total) + total) % total;
+}
+
+function getNearestHomeRailIndex(position, total) {
+    return Math.round(normalizeHomeRailPosition(position, total)) % total;
+}
+
+function clampHomeRailMomentumVelocity(velocity) {
+    if (!isFinite(velocity)) {
+        return 0;
+    }
+
+    return Math.max(-HOME_RAIL_MAX_MOMENTUM_VELOCITY, Math.min(HOME_RAIL_MAX_MOMENTUM_VELOCITY, velocity));
+}
+
+function renderHomeRailSpinCards(descriptor) {
+    var container;
+
+    if (!descriptor || !descriptor.entries.length) {
+        return null;
+    }
+
+    container = byId(descriptor.containerId);
+    if (!container) {
+        return null;
+    }
+
+    if (container.dataset.spinMode === 'true') {
+        return container;
+    }
+
+    container.innerHTML = '';
+    container.classList.add('rail-home-window', 'is-free-spinning');
+    container.classList.remove('is-sliding-left', 'is-sliding-right');
+    container.dataset.spinMode = 'true';
+    container.dataset.windowSize = String(Math.min(getHomeRailVisibleCount(), descriptor.entries.length));
+    delete container.dataset.renderCenter;
+
+    descriptor.entries.forEach(function(entry, entryIndex) {
+        var card = createCard(entry.item, entry.kind, {
+            className: 'is-home-compact',
+            metaText: entry.metaText
+        });
+
+        card.setAttribute('data-home-rail-key', descriptor.key);
+        card.setAttribute('data-home-entry-index', String(entryIndex));
+        card.setAttribute('tabindex', '-1');
+        card.setAttribute('aria-hidden', 'true');
+        container.appendChild(card);
+    });
+
+    return container;
+}
+
+function syncHomeRailContinuousPosition(descriptor, position) {
+    var container;
+    var total;
+    var normalized;
+    var centerSlot;
+    var cards;
+
     if (!descriptor || !descriptor.entries.length) {
         return;
     }
 
-    state.homeRailIndices[descriptor.key] = ((state.homeRailIndices[descriptor.key] || 0) + 1) % descriptor.entries.length;
-    renderSingleHomeRail(descriptor, 'right');
-}
+    total = descriptor.entries.length;
+    normalized = normalizeHomeRailPosition(position, total);
+    centerSlot = getHomeRailCenterOffset(Math.min(getHomeRailVisibleCount(), total));
+    state.homeRailPositions[descriptor.key] = normalized;
 
-function startHomeRailAutoRotation() {
-    if (state.homeRailAutoTimer) {
-        clearInterval(state.homeRailAutoTimer);
+    container = renderHomeRailSpinCards(descriptor);
+    if (!container) {
+        return;
     }
 
-    state.homeRailAutoTimer = setInterval(function() {
-        if (state.currentView !== 'home' || Date.now() < state.homeRailPointerActiveUntil) {
+    container.classList.add('is-free-spinning');
+    cards = queryAll('#' + descriptor.containerId + ' .card');
+    cards.forEach(function(card) {
+        var entryIndex = parseInt(card.getAttribute('data-home-entry-index'), 10);
+        var delta;
+        var absDelta;
+        var metrics;
+
+        if (isNaN(entryIndex)) {
             return;
         }
 
-        getHomeRailDescriptors().filter(function(descriptor) {
-            return descriptor.key !== 'continue';
-        }).forEach(rotateHomeRail);
-    }, HOME_RAIL_AUTO_ROTATE_MS);
+        delta = getShortestCircularDelta(entryIndex, normalized, total);
+        absDelta = Math.abs(delta);
+        metrics = getHomeRailSlotMetrics(centerSlot + delta, centerSlot);
+        metrics.width = Math.max(78, 330 - (absDelta * 34));
+        if (absDelta > centerSlot + 1.25) {
+            metrics.opacity = 0;
+        }
+
+        card.classList.remove('is-home-active');
+        card.classList.add('is-home-compact');
+        card.setAttribute('tabindex', '-1');
+        card.setAttribute('aria-hidden', 'true');
+
+        applyHomeRailSlotVars(card, '', metrics);
+        applyHomeRailSlotVars(card, 'from', metrics);
+    });
+}
+
+function settleHomeRailPosition(descriptor, position) {
+    var total;
+    var start;
+    var target;
+    var delta;
+    var startedAt;
+    var duration = 420;
+
+    if (!descriptor || !descriptor.entries.length) {
+        return;
+    }
+
+    total = descriptor.entries.length;
+    start = normalizeHomeRailPosition(position, total);
+    target = getNearestHomeRailIndex(start, total);
+    delta = getShortestCircularDelta(target, start, total);
+    startedAt = performance.now();
+
+    function tickSettle(now) {
+        var progress = Math.min(1, (now - startedAt) / duration);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        var nextPosition = start + (delta * eased);
+
+        syncHomeRailContinuousPosition(descriptor, nextPosition);
+        if (progress < 1) {
+            state.homeRailMomentumFrame = requestAnimationFrame(tickSettle);
+            return;
+        }
+
+        state.homeRailMomentumFrame = null;
+        state.homeRailMomentumStopAt = 0;
+        state.homeRailIndices[descriptor.key] = target;
+        state.homeRailPositions[descriptor.key] = target;
+        renderSingleHomeRail(descriptor);
+        syncHomeRailFocusAfterDrag(descriptor);
+    }
+
+    stopHomeRailMomentum();
+    state.homeRailSuppressClickUntil = Date.now() + duration + 80;
+    state.homeRailMomentumFrame = requestAnimationFrame(tickSettle);
+}
+
+function startHomeRailMomentum(descriptor, velocityIndex) {
+    var velocity = clampHomeRailMomentumVelocity(velocityIndex || 0);
+    var speed = Math.abs(velocity);
+    var position;
+    var previousAt;
+
+    stopHomeRailMomentum();
+    if (!descriptor || !descriptor.entries.length) {
+        return;
+    }
+
+    position = state.homeRailPositions[descriptor.key];
+    if (typeof position !== 'number') {
+        position = state.homeRailIndices[descriptor.key] || 0;
+    }
+
+    if (speed < 0.00035) {
+        settleHomeRailPosition(descriptor, position);
+        return;
+    }
+
+    state.homeRailMomentumStopAt = Date.now() + HOME_RAIL_MOMENTUM_MS;
+    state.homeRailSuppressClickUntil = state.homeRailMomentumStopAt;
+    previousAt = performance.now();
+
+    function tickMomentum(now) {
+        var elapsed = Math.min(48, Math.max(1, now - previousAt));
+        var friction;
+
+        previousAt = now;
+        if (Date.now() >= state.homeRailMomentumStopAt || state.currentView !== 'home' || state.homeRailDrag) {
+            stopHomeRailMomentum();
+            settleHomeRailPosition(descriptor, position);
+            syncHomeRailFocusAfterDrag(descriptor);
+            return;
+        }
+
+        position = normalizeHomeRailPosition(position + (velocity * elapsed), descriptor.entries.length);
+        friction = Math.pow(0.045, elapsed / HOME_RAIL_MOMENTUM_MS);
+        velocity *= friction;
+        state.homeRailPointerActiveUntil = Date.now() + HOME_RAIL_MOMENTUM_MS + 300;
+        syncHomeRailContinuousPosition(descriptor, position);
+        syncHomeRailFocusAfterDrag(descriptor);
+
+        if (Math.abs(velocity) < 0.00035) {
+            stopHomeRailMomentum();
+            settleHomeRailPosition(descriptor, position);
+            return;
+        }
+
+        state.homeRailMomentumFrame = requestAnimationFrame(tickMomentum);
+    }
+
+    state.homeRailMomentumFrame = requestAnimationFrame(tickMomentum);
 }
 
 function getSearchPaneInfo() {
@@ -4236,8 +4539,8 @@ function renderBrowseGenreRows() {
 }
 
 function renderBrowseViews() {
-    renderCardRows('movieGrid', state.movieBrowseItems, 'movie', 5);
-    renderCardRows('seriesGrid', state.seriesBrowseItems, 'series', 5);
+    renderCardRows('movieGrid', state.movieBrowseItems, 'movie', 6);
+    renderCardRows('seriesGrid', state.seriesBrowseItems, 'series', 6);
 
     byId('movieCount').textContent = state.movieBrowseItems.length + ' loaded • ' + getSelectedBrowseLabel('movie');
     byId('seriesCount').textContent = state.seriesBrowseItems.length + ' loaded • ' + getSelectedBrowseLabel('series');
@@ -5187,7 +5490,7 @@ function fetchStreamsFromAddon(addon, type, videoId) {
         }]);
     }
 
-    return requestJson(baseUrl + '/stream/' + encodeURIComponent(type) + '/' + encodeURIComponent(videoId) + '.json', 'GET')
+    return requestAddonJson(baseUrl + '/stream/' + encodeURIComponent(type) + '/' + encodeURIComponent(videoId) + '.json')
         .then(function(payload) {
             var streams = payload && Array.isArray(payload.streams) ? payload.streams : [];
 
@@ -5548,8 +5851,10 @@ function renderPlayerState() {
         byId('playerAddon').textContent = '-';
         byId('playerSource').textContent = '-';
         setPlayerStatus('Idle');
-        empty.classList.remove('is-hidden');
-        empty.textContent = 'Pick an addon stream to open the player.';
+        if (empty) {
+            empty.classList.remove('is-hidden');
+            empty.textContent = 'Pick an addon stream to open the player.';
+        }
         byId('playerDescription').textContent =
             'This player page is for direct stream URLs. Some addon entries may still require a proxy or native playback layer.';
         clearPlaybackSurface();
@@ -5567,8 +5872,10 @@ function renderPlayerState() {
     syncExternalSubtitleTracks();
 
     if (!stream.playable || !stream.raw || !stream.raw.url) {
-        empty.classList.remove('is-hidden');
-        empty.textContent = 'This stream is not directly playable in the web shell. It likely needs a proxy or native playback pipeline.';
+        if (empty) {
+            empty.classList.remove('is-hidden');
+            empty.textContent = 'This stream is not directly playable in the web shell. It likely needs a proxy or native playback pipeline.';
+        }
         clearPlaybackSurface();
         setPlayerStatus(stream.status);
         renderTrackSelectors();
@@ -5576,8 +5883,12 @@ function renderPlayerState() {
         return;
     }
 
-    empty.classList.add('is-hidden');
-    video.classList.remove('is-hidden');
+    if (empty) {
+        empty.classList.add('is-hidden');
+    }
+    if (video) {
+        video.classList.remove('is-hidden');
+    }
     renderTrackSelectors();
     setPlayerNextEpisodeUi();
 }
@@ -5587,6 +5898,7 @@ function startHtml5Stream(url) {
     var retryCorsSafe = arguments[2] === true;
     var serverOverride = arguments[3] || '';
     var video = byId('videoPlayer');
+    var surface = byId('avplaySurface');
     var seekMs = state.pendingSeekMs || 0;
     var playbackUrl = serverOverride
         ? buildStreamingServerHlsUrl(url, state.currentStream, serverOverride, seekMs)
@@ -5595,6 +5907,12 @@ function startHtml5Stream(url) {
     var usesStreamingServer = playbackUrl !== url;
     var isCorsUnsafeLocal = /^http:\/\/(127\.0\.0\.1|localhost):11470/i.test(playbackUrl);
     var isStremioLocal = /^https:\/\/local\.strem\.io:12470/i.test(playbackUrl);
+
+    if (!video) {
+        setPlayerStatus('Video surface unavailable');
+        setPlayerToggleUi(false);
+        return;
+    }
 
     function beginHtml5Playback() {
         var playPromise = video.play();
@@ -5617,12 +5935,12 @@ function startHtml5Stream(url) {
 
     stopAvplayPlayback();
     destroyHlsPlayer();
-    byId('avplaySurface').classList.remove('is-active');
+    if (surface) {
+        surface.classList.remove('is-active');
+    }
     video.classList.remove('is-hidden');
-    video.muted = false;
-    video.defaultMuted = false;
-    video.volume = 1;
     state.playerMode = 'html5';
+    applyPlayerVolume(false);
     state.html5FallbackUrl = playbackUrl !== url ? url : '';
     state.transcoderOffsetMs = usesStreamingServer ? seekMs : 0;
     state.pendingSeekMs = null;
@@ -5635,7 +5953,7 @@ function startHtml5Stream(url) {
         state.hlsPlayer.on(Hls.Events.ERROR, function(_, data) {
             if (data && data.fatal) {
                 if (isCorsUnsafeLocal && !retryCorsSafe) {
-                    setPlayerStatus('Retrying streaming server through local.strem.io');
+                    setPlayerStatus('Retrying through Nuvio transcoder');
                     startHtml5Stream(url, false, true);
                     return;
                 }
@@ -5678,15 +5996,22 @@ function startAvplayStream(url) {
         startHtml5Stream(url);
         return;
     }
+    if (!video || !surface) {
+        setPlayerStatus('Video surface unavailable');
+        setPlayerToggleUi(false);
+        return;
+    }
 
     stopHtml5Playback();
     stopAvplayPlayback();
     surface.classList.add('is-active');
     video.classList.add('is-hidden');
     state.playerMode = 'avplay';
+    applyPlayerVolume(false);
 
     try {
         webapis.avplay.open(url);
+        applyPlayerVolume(false);
         webapis.avplay.setListener({
             onbufferingstart: function() {
                 setPlayerStatus('Buffering (AVPlay)');
@@ -5720,6 +6045,7 @@ function startAvplayStream(url) {
         webapis.avplay.prepareAsync(function() {
             syncAvplayRect();
             try {
+                applyPlayerVolume(false);
                 webapis.avplay.play();
                 setPlayerStatus('Playing (AVPlay)');
                 setPlayerToggleUi(true);
@@ -5860,7 +6186,13 @@ function getCircularHomeWindow(entries, startIndex, count) {
 }
 
 function getHomeRailVisibleCount() {
-    return Math.min(HOME_RAIL_VISIBLE_DEFAULT, window.innerWidth >= 1560 ? 7 : 5);
+    if (window.innerWidth >= 1760) {
+        return HOME_RAIL_VISIBLE_DEFAULT;
+    }
+    if (window.innerWidth >= 1280) {
+        return 9;
+    }
+    return 7;
 }
 
 function getHomeRailCenterOffset(count) {
@@ -5871,12 +6203,60 @@ function getCenteredHomeWindow(entries, selectedIndex, count) {
     return getCircularHomeWindow(entries, selectedIndex - getHomeRailCenterOffset(count), count);
 }
 
-function renderSingleHomeRail(descriptor, direction) {
+function getShortestCircularDelta(index, centerIndex, total) {
+    var delta = index - centerIndex;
+
+    if (!total) {
+        return 0;
+    }
+
+    if (delta > total / 2) {
+        delta -= total;
+    } else if (delta < -total / 2) {
+        delta += total;
+    }
+
+    return delta;
+}
+
+function getHomeRailSlotMetrics(slotIndex, centerIndex) {
+    var offset = slotIndex - centerIndex;
+    var distance = Math.abs(offset);
+    var angle = offset * 0.32;
+    var x = Math.sin(angle) * 1500;
+    var depth = (Math.cos(angle) * 280) - (distance * 42);
+
+    return {
+        offset: offset,
+        distance: distance,
+        x: x,
+        width: Math.max(78, 330 - (distance * 34)),
+        scale: Math.max(0.32, 1 - (distance * 0.13)),
+        depth: depth,
+        rotate: angle * -62,
+        opacity: Math.max(0.26, 1 - (distance * 0.14))
+    };
+}
+
+function applyHomeRailSlotVars(card, prefix, metrics) {
+    var namePrefix = prefix ? '--rail-' + prefix + '-' : '--rail-';
+
+    card.style.setProperty(namePrefix + 'offset', String(metrics.offset));
+    card.style.setProperty(namePrefix + 'distance', String(metrics.distance));
+    card.style.setProperty(namePrefix + 'x', String(metrics.x));
+    card.style.setProperty(namePrefix + 'width', String(metrics.width) + 'px');
+    card.style.setProperty(namePrefix + 'scale', String(metrics.scale));
+    card.style.setProperty(namePrefix + 'depth', String(metrics.depth));
+    card.style.setProperty(namePrefix + 'rotate', String(metrics.rotate));
+    card.style.setProperty(namePrefix + 'opacity', String(metrics.opacity));
+}
+
+function renderSingleHomeRail(descriptor, direction, previousIndex) {
     if (!descriptor) {
         return;
     }
 
-    renderHomeRailWindow(descriptor.containerId, descriptor.entries, descriptor.key, direction);
+    renderHomeRailWindow(descriptor.containerId, descriptor.entries, descriptor.key, direction, previousIndex);
 }
 
 function getDefaultSearchSuggestions() {
@@ -5912,7 +6292,7 @@ function getDefaultSearchSuggestions() {
 
 function syncSearchDisplay() {
     var input = byId('searchTextInput');
-    byId('searchDisplayValue').textContent = state.searchQuery || 'Search titles';
+
     if (input && input.value !== state.searchQuery) {
         input.value = state.searchQuery;
     }
@@ -5965,7 +6345,9 @@ function renderSearchResults() {
     renderCardRows('searchResultGrid', state.searchResults, null, 5);
 
     byId('searchResultCount').textContent = total ? total + ' result' + (total === 1 ? '' : 's') : 'No results yet';
-    empty.classList.toggle('is-visible', !total);
+    if (empty) {
+        empty.classList.toggle('is-visible', !total);
+    }
     renderSearchSuggestions();
     syncSearchDisplay();
 }
@@ -6091,6 +6473,7 @@ function createCard(item, kind) {
         var img = document.createElement('img');
         img.src = item.poster;
         img.alt = item.name || 'Poster';
+        img.draggable = false;
         poster.appendChild(img);
     } else {
         poster.classList.add('is-empty');
@@ -6117,7 +6500,17 @@ function createCard(item, kind) {
     card.appendChild(meta);
     card.appendChild(synopsis);
 
+    card.addEventListener('dragstart', function(event) {
+        event.preventDefault();
+    });
+
     card.addEventListener('click', function() {
+        if (Date.now() < state.homeRailSuppressClickUntil) {
+            return;
+        }
+        if (card.hasAttribute('data-home-rail-key') && !card.classList.contains('is-home-active')) {
+            return;
+        }
         prepareSelection(item, kind, options.video && options.video.id ? {
             resumeVideoId: options.video.id
         } : null);
@@ -6134,12 +6527,14 @@ function renderCards(containerId, items, kind) {
     });
 }
 
-function renderHomeRailWindow(containerId, entries, key, direction) {
+function renderHomeRailWindow(containerId, entries, key, direction, previousIndex) {
     var container = byId(containerId);
     var index;
     var visible;
     var visibleCount;
     var centerIndex;
+    var total;
+    var moveStep;
 
     container.innerHTML = '';
     container.classList.add('rail-home-window');
@@ -6147,7 +6542,12 @@ function renderHomeRailWindow(containerId, entries, key, direction) {
 
     if (!entries.length) {
         state.homeRailIndices[key] = 0;
+        if (state.homeRailPositions[key] !== undefined) {
+            state.homeRailPositions[key] = 0;
+        }
         container.dataset.windowSize = '0';
+        delete container.dataset.renderCenter;
+        delete container.dataset.spinMode;
         return;
     }
 
@@ -6159,29 +6559,52 @@ function renderHomeRailWindow(containerId, entries, key, direction) {
         index = 0;
     }
     state.homeRailIndices[key] = index;
+    if (!direction && state.homeRailPositions[key] !== undefined) {
+        state.homeRailPositions[key] = index;
+    }
 
+    total = entries.length;
     visibleCount = Math.min(getHomeRailVisibleCount(), entries.length);
     centerIndex = getHomeRailCenterOffset(visibleCount);
+    if (typeof previousIndex !== 'number' || previousIndex < 0) {
+        previousIndex = index;
+    }
+    moveStep = direction === 'left' ? -1 : 1;
     container.dataset.windowSize = String(visibleCount);
+    container.dataset.activeIndex = String(index);
+    container.dataset.renderCenter = String(index);
+    delete container.dataset.spinMode;
+    container.classList.remove('is-free-spinning');
     visible = getCenteredHomeWindow(entries, index, visibleCount);
 
     visible.forEach(function(entry, visibleIndex) {
         var entryIndex = ((index - centerIndex + visibleIndex) % entries.length + entries.length) % entries.length;
+        var slotMetrics = getHomeRailSlotMetrics(visibleIndex, centerIndex);
+        var previousSlotIndex = centerIndex + getShortestCircularDelta(entryIndex, previousIndex, total);
+        var previousMetrics;
         var card = createCard(entry.item, entry.kind, {
             className: visibleIndex === centerIndex ? 'is-home-active' : 'is-home-compact',
-            metaText: entry.metaText,
-            showSynopsis: visibleIndex === centerIndex,
-            homeFeatureLayout: visibleIndex === centerIndex
+            metaText: entry.metaText
         });
 
         card.setAttribute('data-home-rail-key', key);
         card.setAttribute('data-home-entry-index', String(entryIndex));
+        card.setAttribute('data-home-rail-slot', String(visibleIndex));
+        card.setAttribute('tabindex', visibleIndex === centerIndex ? getInteractiveTabIndex() : '-1');
+        if (visibleIndex !== centerIndex) {
+            card.setAttribute('aria-hidden', 'true');
+        }
         card.style.setProperty('--rail-order', String(visibleIndex));
-        card.style.setProperty('--rail-distance', String(Math.abs(visibleIndex - centerIndex)));
-        card.style.setProperty('--rail-offset', String(visibleIndex - centerIndex));
-        card.style.setProperty('--rail-scale', String(Math.max(0.48, 1 - (Math.abs(visibleIndex - centerIndex) * 0.16))));
-        card.style.setProperty('--rail-depth', String((centerIndex - Math.abs(visibleIndex - centerIndex)) * 56));
-        card.style.setProperty('--rail-rotate', String((centerIndex - visibleIndex) * 11));
+        if (direction && (previousSlotIndex < 0 || previousSlotIndex >= visibleCount)) {
+            previousSlotIndex = direction === 'right' ? visibleCount : -1;
+        }
+        previousMetrics = getHomeRailSlotMetrics(previousSlotIndex, centerIndex);
+        if (!direction) {
+            previousMetrics = slotMetrics;
+        }
+        applyHomeRailSlotVars(card, '', slotMetrics);
+        applyHomeRailSlotVars(card, 'from', previousMetrics);
+        card.style.setProperty('--rail-spin', String(moveStep * -2));
         container.appendChild(card);
     });
 
@@ -6438,11 +6861,121 @@ function bindPointerHover() {
         }
 
         if (target.classList && target.classList.contains('card') && target.hasAttribute('data-home-rail-key')) {
-            activateHomeRailHover(target, event);
             return;
         }
 
         activatePointerMainElement(target);
+    });
+}
+
+function getHomeRailDescriptorByContainerId(containerId) {
+    return getHomeRailDescriptors().filter(function(descriptor) {
+        return descriptor.containerId === containerId;
+    })[0] || null;
+}
+
+function syncHomeRailFocusAfterDrag(descriptor) {
+    var container = descriptor && byId(descriptor.containerId);
+    var activeCard = container ? container.querySelector('.card.is-home-active') : null;
+
+    if (activeCard) {
+        activatePointerMainElement(activeCard);
+    }
+}
+
+function bindHomeRailDrag() {
+    ['homeMovieRail', 'homeSeriesRail'].forEach(function(containerId) {
+        var container = byId(containerId);
+
+        if (!container) {
+            return;
+        }
+
+        container.addEventListener('pointerdown', function(event) {
+            var descriptor = getHomeRailDescriptorByContainerId(containerId);
+
+            if (!descriptor || !descriptor.entries.length || (event.pointerType && event.pointerType === 'mouse' && event.button !== 0)) {
+                return;
+            }
+
+            stopHomeRailMomentum();
+            setInputMode('pointer');
+            state.homeRailPointerActiveUntil = Date.now() + 4200;
+            state.homeRailDrag = {
+                containerId: containerId,
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                lastX: event.clientX,
+                lastAt: Date.now(),
+                position: typeof state.homeRailPositions[descriptor.key] === 'number'
+                    ? state.homeRailPositions[descriptor.key]
+                    : (state.homeRailIndices[descriptor.key] || 0),
+                velocityIndex: 0,
+                didDrag: false
+            };
+            container.classList.add('is-dragging');
+            if (container.setPointerCapture && event.pointerId !== undefined) {
+                try {
+                    container.setPointerCapture(event.pointerId);
+                } catch (error1) {
+                    // no-op
+                }
+            }
+        });
+
+        container.addEventListener('pointermove', function(event) {
+            var drag = state.homeRailDrag;
+            var descriptor;
+            var deltaX;
+            var now;
+            var elapsed;
+
+            if (!drag || drag.containerId !== containerId || drag.pointerId !== event.pointerId) {
+                return;
+            }
+
+            state.homeRailPointerActiveUntil = Date.now() + 4200;
+            now = Date.now();
+            deltaX = event.clientX - drag.lastX;
+            elapsed = Math.max(1, now - drag.lastAt);
+            drag.lastX = event.clientX;
+            drag.lastAt = now;
+            descriptor = getHomeRailDescriptorByContainerId(containerId);
+            if (!descriptor || !descriptor.entries.length) {
+                return;
+            }
+            drag.velocityIndex = clampHomeRailMomentumVelocity((drag.velocityIndex * 0.62) + ((-deltaX / HOME_RAIL_DRAG_STEP_PX / elapsed) * 0.38));
+            drag.position = normalizeHomeRailPosition(drag.position - (deltaX / HOME_RAIL_DRAG_STEP_PX), descriptor.entries.length);
+            if (Math.abs(event.clientX - drag.startX) > 8) {
+                drag.didDrag = true;
+            }
+
+            syncHomeRailContinuousPosition(descriptor, drag.position);
+            syncHomeRailFocusAfterDrag(descriptor);
+            event.preventDefault();
+        });
+
+        function endDrag(event) {
+            var drag = state.homeRailDrag;
+            var descriptor;
+
+            if (!drag || drag.containerId !== containerId || (event.pointerId !== undefined && drag.pointerId !== event.pointerId)) {
+                return;
+            }
+
+            descriptor = getHomeRailDescriptorByContainerId(containerId);
+            if (drag.didDrag) {
+                state.homeRailSuppressClickUntil = Date.now() + 260;
+                startHomeRailMomentum(descriptor, drag.velocityIndex);
+            }
+            state.homeRailPointerActiveUntil = Date.now() + 4200;
+            state.homeRailDrag = null;
+            container.classList.remove('is-dragging');
+            syncHomeRailFocusAfterDrag(descriptor);
+        }
+
+        container.addEventListener('pointerup', endDrag);
+        container.addEventListener('pointercancel', endDrag);
     });
 }
 
@@ -6607,6 +7140,8 @@ function bindPlayer() {
     var seekForwardGlyph = byId('playerSeekForwardButton');
     var nextEpisodeGlyph = byId('playerNextEpisodeButton');
     var audioGlyph = byId('playerAudioButton');
+    var muteButton = byId('playerMuteButton');
+    var volumeSlider = byId('playerVolumeSlider');
 
     controller.addEventListener('click', function(event) {
         event.stopPropagation();
@@ -6636,6 +7171,21 @@ function bindPlayer() {
     byId('playerSeekForwardButton').addEventListener('click', function() {
         seekCurrentPlayback(30000);
     });
+
+    if (muteButton) {
+        muteButton.addEventListener('click', function() {
+            togglePlayerMute();
+        });
+    }
+
+    if (volumeSlider) {
+        volumeSlider.addEventListener('input', function() {
+            setPlayerVolume(parseInt(volumeSlider.value, 10) / 100);
+        });
+        volumeSlider.addEventListener('change', function() {
+            setPlayerVolume(parseInt(volumeSlider.value, 10) / 100);
+        });
+    }
 
     byId('playerNextEpisodeButton').addEventListener('click', function() {
         playNextEpisode();
@@ -6696,6 +7246,12 @@ function bindPlayer() {
     video.addEventListener('timeupdate', readHtml5Metrics);
     video.addEventListener('durationchange', refreshPlaybackTracks);
     video.addEventListener('durationchange', readHtml5Metrics);
+    video.addEventListener('volumechange', function() {
+        state.playerVolume = clampPlayerVolume(video.volume);
+        state.playerMuted = video.muted;
+        updatePlayerVolumeUi();
+        persistPlayerVolume();
+    });
     video.addEventListener('playing', function() {
         setPlayerToggleUi(true);
         setPlayerStatus(state.html5FallbackUrl ? 'Playing through streaming server' : 'Playing');
@@ -6754,12 +7310,14 @@ function handleLeft() {
     if (state.currentView === 'home' && state.focusRegion === 'main' && state.mainRow > 0) {
         var homeRailLeft = getHomeRailDescriptorForMainRow(state.mainRow);
         if (homeRailLeft) {
+            var previousHomeRailLeftIndex;
             if (!homeRailLeft.entries.length) {
                 return;
             }
-            state.homeRailIndices[homeRailLeft.key] = (state.homeRailIndices[homeRailLeft.key] - 1 + homeRailLeft.entries.length) % homeRailLeft.entries.length;
+            previousHomeRailLeftIndex = state.homeRailIndices[homeRailLeft.key] || 0;
+            state.homeRailIndices[homeRailLeft.key] = (previousHomeRailLeftIndex - 1 + homeRailLeft.entries.length) % homeRailLeft.entries.length;
             state.mainCol = getHomeRailCenterOffset();
-            renderSingleHomeRail(homeRailLeft, 'left');
+            renderSingleHomeRail(homeRailLeft, 'left', previousHomeRailLeftIndex);
             focusCurrent();
             return;
         }
@@ -6819,12 +7377,14 @@ function handleRight() {
     if (state.currentView === 'home' && state.focusRegion === 'main' && state.mainRow > 0) {
         var homeRailRight = getHomeRailDescriptorForMainRow(state.mainRow);
         if (homeRailRight) {
+            var previousHomeRailRightIndex;
             if (!homeRailRight.entries.length) {
                 return;
             }
-            state.homeRailIndices[homeRailRight.key] = (state.homeRailIndices[homeRailRight.key] + 1) % homeRailRight.entries.length;
+            previousHomeRailRightIndex = state.homeRailIndices[homeRailRight.key] || 0;
+            state.homeRailIndices[homeRailRight.key] = (previousHomeRailRightIndex + 1) % homeRailRight.entries.length;
             state.mainCol = getHomeRailCenterOffset();
-            renderSingleHomeRail(homeRailRight, 'right');
+            renderSingleHomeRail(homeRailRight, 'right', previousHomeRailRightIndex);
             focusCurrent();
             return;
         }
@@ -7030,13 +7590,14 @@ function init() {
 
     bindNav();
     bindPointerHover();
+    bindHomeRailDrag();
     bindHomeActions();
     bindDetailActions();
     bindSearch();
     bindBrowse();
     bindLogin();
     bindPlayer();
-    startHomeRailAutoRotation();
+    restorePlayerVolume();
 
     restoreStoredSession();
     restoreContinueWatching();

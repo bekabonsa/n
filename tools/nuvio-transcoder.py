@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -12,7 +13,9 @@ import time
 import traceback
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 
 ROOT = Path(tempfile.gettempdir()) / "nuvio-hls"
@@ -23,14 +26,17 @@ CONFIG = {
     "max_sessions": 3,
     "idle_ttl": 20 * 60,
     "playlist_timeout": 35,
+    "proxy_timeout": 25,
+    "proxy_retries": 3,
 }
+PIPELINE_VERSION = "video_copy_fmp4_audio_aac_v2"
 
 QUALITY = {
-    "auto": {"height": 1080, "video_bitrate": "5500k", "bufsize": "11000k", "crf": "24"},
-    "1080p": {"height": 1080, "video_bitrate": "5500k", "bufsize": "11000k", "crf": "24"},
-    "720p": {"height": 720, "video_bitrate": "3200k", "bufsize": "6400k", "crf": "25"},
-    "480p": {"height": 480, "video_bitrate": "1600k", "bufsize": "3200k", "crf": "26"},
-    "copy": {"height": 0, "video_bitrate": "", "bufsize": "", "crf": ""},
+    "auto": {},
+    "1080p": {},
+    "720p": {},
+    "480p": {},
+    "copy": {},
 }
 
 
@@ -70,6 +76,13 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), fmt % args))
 
+    def log_client_disconnect(self):
+        print("%s - - [%s] Client closed request for %s" % (
+            self.client_address[0],
+            self.log_date_time_string(),
+            self.path,
+        ))
+
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
@@ -88,9 +101,8 @@ class Handler(SimpleHTTPRequestHandler):
 
         if len(parts) >= 3 and parts[0] == "hlsv2":
             media_url = query.get("mediaURL", [""])[0]
-            quality = normalize_quality(query.get("quality", [CONFIG["quality"]])[0])
             seek_seconds = parse_int(query.get("seek", ["0"])[0])
-            session = session_key(parts[1], media_url, seek_seconds, quality) if media_url else safe_name(parts[1])
+            session = session_key(parts[1], media_url, seek_seconds) if media_url else safe_name(parts[1])
             return str(ROOT / "hlsv2" / session / "/".join(parts[2:]))
 
         return str(ROOT / parsed.path.lstrip("/"))
@@ -99,6 +111,15 @@ class Handler(SimpleHTTPRequestHandler):
         data = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def send_playlist(self, playlist):
+        text = rewrite_playlist_segments(playlist)
+        data = text.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -116,6 +137,19 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"ok": True})
             return
 
+        if parsed.path == "/proxy-json":
+            target_url = query.get("url", [""])[0]
+            if not target_url:
+                self.send_json({"error": "Missing url"}, 400)
+                return
+            try:
+                payload, status = fetch_json_proxy(target_url)
+                self.send_json(payload, status)
+            except Exception as error:
+                traceback.print_exc()
+                self.send_json({"error": str(error)}, 502)
+            return
+
         if parsed.path.endswith("/video0.m3u8") and query.get("mediaURL"):
             try:
                 session = parsed.path.strip("/").split("/")[1]
@@ -123,15 +157,30 @@ class Handler(SimpleHTTPRequestHandler):
                 seek_seconds = parse_int(query.get("seek", ["0"])[0])
                 quality = normalize_quality(query.get("quality", [CONFIG["quality"]])[0])
                 playlist = ensure_hls(session, media_url, seek_seconds, quality)
-                if not wait_for_file(playlist, CONFIG["playlist_timeout"]):
+                if not wait_for_playlist_ready(playlist, CONFIG["playlist_timeout"]):
                     self.send_error(503, "Playlist is not ready. ffmpeg may still be buffering or failed.")
                     return
+                self.send_playlist(playlist)
+                return
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                self.log_client_disconnect()
+                return
             except Exception as error:
                 traceback.print_exc()
                 self.send_error(500, str(error))
                 return
 
-        return super().do_GET()
+        if parsed.path.startswith("/hlsv2/") and (
+                parsed.path.endswith(".ts")
+                or parsed.path.endswith(".m4s")
+                or parsed.path.endswith(".mp4")):
+            wait_for_file(Path(self.translate_path(self.path)), 6)
+
+        try:
+            return super().do_GET()
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            self.log_client_disconnect()
+            return
 
 
 def safe_name(value):
@@ -166,83 +215,174 @@ def wait_for_file(path, timeout):
     return False
 
 
-def probe_media(media_url):
+def wait_for_playlist_ready(playlist, timeout):
+    deadline = time.time() + timeout
+
+    while time.time() < deadline:
+        ready, missing = playlist_is_ready(playlist)
+        if ready:
+            return True
+        if missing:
+            wait_for_file(missing, min(1, max(0, deadline - time.time())))
+        else:
+            time.sleep(0.25)
+
+    return False
+
+
+def playlist_is_ready(playlist):
+    text = ""
+    segment_name = ""
+    init_name = ""
+
+    if not playlist.exists() or playlist.stat().st_size <= 0:
+        return False, playlist
+
+    text = playlist.read_text(encoding="utf-8", errors="replace")
+    for line in text.splitlines():
+        stripped = line.strip()
+        map_match = re.search(r'URI="([^"]+)"', stripped)
+        if map_match and not init_name:
+            init_name = map_match.group(1)
+        if stripped and not stripped.startswith("#"):
+            segment_name = stripped
+            break
+
+    if not segment_name:
+        return False, playlist
+
+    if init_name:
+        init_path = playlist_local_path(playlist, init_name)
+        if not init_path.exists() or init_path.stat().st_size <= 0:
+            return False, init_path
+
+    segment_path = playlist_local_path(playlist, segment_name)
+    if not segment_path.exists() or segment_path.stat().st_size <= 0:
+        return False, segment_path
+
+    return True, None
+
+
+def playlist_local_path(playlist, value):
+    local_path = Path(value)
+
+    if local_path.is_absolute():
+        return local_path
+
+    return playlist.parent / value
+
+
+def playlist_served_name(value):
+    return value.replace("\\", "/").rstrip("/").split("/")[-1]
+
+
+def rewrite_playlist_segments(playlist):
+    base_url = f"/hlsv2/{quote(playlist.parent.name, safe='')}/"
+    lines = []
+
+    def rewrite_uri(match):
+        uri = match.group(1)
+        if not uri or "://" in uri or uri.startswith("/"):
+            return match.group(0)
+        return 'URI="' + base_url + quote(playlist_served_name(uri), safe="/") + '"'
+
+    for line in playlist.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            lines.append(re.sub(r'URI="([^"]+)"', rewrite_uri, line))
+            continue
+        if not stripped or "://" in stripped or stripped.startswith("/"):
+            lines.append(line)
+            continue
+        lines.append(base_url + quote(playlist_served_name(stripped), safe="/"))
+
+    return "\n".join(lines) + "\n"
+
+
+def probe_video_codec(media_url):
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
-        return {}
+        return ""
 
     cmd = [
         ffprobe,
         "-v", "error",
-        "-print_format", "json",
-        "-show_streams",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=codec_name",
+        "-of", "default=noprint_wrappers=1:nokey=1",
         media_url,
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
     except Exception:
-        return {}
+        return ""
 
     if result.returncode != 0:
-        return {}
+        return ""
 
+    return (result.stdout or "").strip().splitlines()[0].lower() if result.stdout else ""
+
+
+def build_video_args(video_codec):
+    args = ["-c:v", "copy"]
+    mode = "copy-video-fmp4-transcode-audio"
+
+    if video_codec in ("hevc", "h265"):
+        args += ["-tag:v", "hvc1"]
+        mode += "-hvc1"
+
+    return args, mode
+
+
+def fetch_json_proxy(target_url):
+    parsed = urlparse(target_url)
+    last_error = None
+
+    if parsed.scheme not in ("http", "https"):
+        return {"error": "Only HTTP(S) URLs are supported"}, 400
+
+    for attempt in range(CONFIG["proxy_retries"]):
+        try:
+            request = Request(target_url, headers={
+                "Accept": "application/json",
+                "User-Agent": "Mozilla/5.0 NuvioTranscoder/2.0",
+            })
+            with urlopen(request, timeout=CONFIG["proxy_timeout"]) as response:
+                text = response.read().decode("utf-8", errors="replace")
+                return json.loads(text), response.status
+        except HTTPError as error:
+            last_error = error
+            if error.code < 500 and error.code != 429:
+                text = error.read().decode("utf-8", errors="replace")
+                return safe_json_error(text, error.code), error.code
+        except (URLError, TimeoutError) as error:
+            last_error = error
+
+        time.sleep(0.6 * (attempt + 1))
+
+    return {"error": str(last_error or "Proxy request failed")}, 502
+
+
+def safe_json_error(text, status):
     try:
-        return json.loads(result.stdout or "{}")
+        payload = json.loads(text)
+        if isinstance(payload, dict):
+            return payload
     except Exception:
-        return {}
+        pass
+    return {"error": text.strip() or f"HTTP {status}"}
 
 
-def get_first_stream(probe, kind):
-    for stream in probe.get("streams", []):
-        if stream.get("codec_type") == kind:
-            return stream
-    return {}
-
-
-def can_copy_video(video_stream, quality):
-    codec = (video_stream.get("codec_name") or "").lower()
-    width = int(video_stream.get("width") or 0)
-    height = int(video_stream.get("height") or 0)
-
-    if quality != "copy":
-        return False
-    if codec not in ("h264", "hevc"):
-        return False
-    return width <= 3840 and height <= 2160
-
-
-def build_video_args(video_stream, quality):
-    settings = QUALITY[quality]
-
-    if can_copy_video(video_stream, quality):
-        return ["-c:v", "copy"], "copy-video"
-
-    vf = []
-    if settings["height"]:
-        vf = ["-vf", "scale=-2:min(%d\\,ih)" % settings["height"]]
-
-    return [
-        *vf,
-        "-c:v", "libx264",
-        "-preset", "superfast",
-        "-tune", "zerolatency",
-        "-crf", settings["crf"],
-        "-maxrate", settings["video_bitrate"],
-        "-bufsize", settings["bufsize"],
-        "-pix_fmt", "yuv420p",
-    ], "transcode-video"
-
-
-def session_key(session, media_url, seek_seconds, quality):
+def session_key(session, media_url, seek_seconds):
     digest = hashlib.sha1(media_url.encode("utf-8")).hexdigest()[:12]
-    return f"{safe_name(session)}_{digest}_q_{quality}_seek_{seek_seconds}"
+    return f"{safe_name(session)}_{digest}_{PIPELINE_VERSION}_seek_{seek_seconds}"
 
 
 def ensure_hls(session, media_url, seek_seconds=0, quality="auto"):
     ffmpeg = require_tool("ffmpeg")
     cleanup_sessions()
 
-    key = session_key(session, media_url, seek_seconds, quality)
+    key = session_key(session, media_url, seek_seconds)
     out_dir = ROOT / "hlsv2" / key
     playlist = out_dir / "video0.m3u8"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -255,10 +395,10 @@ def ensure_hls(session, media_url, seek_seconds=0, quality="auto"):
                 return playlist
             SESSIONS.pop(key, None)
 
-    probe = probe_media(media_url)
-    video_stream = get_first_stream(probe, "video")
-    video_args, mode = build_video_args(video_stream, quality)
-    segment = out_dir / "segment_%05d.ts"
+    video_codec = probe_video_codec(media_url)
+    video_args, mode = build_video_args(video_codec)
+    segment = out_dir / "segment_%05d.m4s"
+    init_segment = out_dir / "init.mp4"
 
     cmd = [
         ffmpeg,
@@ -270,7 +410,13 @@ def ensure_hls(session, media_url, seek_seconds=0, quality="auto"):
         "-probesize", "100M",
         "-reconnect", "1",
         "-reconnect_streamed", "1",
+        "-reconnect_at_eof", "1",
+        "-reconnect_on_network_error", "1",
+        "-reconnect_on_http_error", "4xx,5xx",
         "-reconnect_delay_max", "5",
+        "-reconnect_delay_total_max", "90",
+        "-rw_timeout", "15000000",
+        "-user_agent", "Mozilla/5.0 NuvioTranscoder/2.0",
     ]
     if seek_seconds > 0:
         cmd += ["-ss", str(seek_seconds)]
@@ -289,12 +435,14 @@ def ensure_hls(session, media_url, seek_seconds=0, quality="auto"):
         "-hls_time", "4",
         "-hls_list_size", "0",
         "-hls_playlist_type", "event",
+        "-hls_segment_type", "fmp4",
+        "-hls_fmp4_init_filename", str(init_segment),
         "-hls_flags", "independent_segments+temp_file",
         "-hls_segment_filename", str(segment),
         str(playlist),
     ]
 
-    print(f"Starting ffmpeg session {key} ({mode}, quality={quality}, seek={seek_seconds}s)")
+    print(f"Starting ffmpeg session {key} ({mode}, seek={seek_seconds}s)")
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.DEVNULL,
@@ -400,8 +548,8 @@ def main():
     ROOT.mkdir(parents=True, exist_ok=True)
     os.chdir(ROOT)
     print(f"Nuvio transcoder listening on http://{args.host}:{args.port}")
-    print(f"Quality={CONFIG['quality']} maxSessions={CONFIG['max_sessions']}")
-    print("Requires ffmpeg and ffprobe on PATH.")
+    print(f"Mode=copy video/transcode audio maxSessions={CONFIG['max_sessions']}")
+    print("Requires ffmpeg on PATH.")
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()
 
 
